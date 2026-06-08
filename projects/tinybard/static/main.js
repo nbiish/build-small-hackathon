@@ -30,44 +30,40 @@ const modelStatus = document.getElementById("model-status");
 const boot = document.getElementById("boot");
 
 // ---------------------------------------------------------------------------
-// Gradio Client
+// API client — uses FastAPI clean-JSON endpoints
 // ---------------------------------------------------------------------------
-let gradioClient = null;
-const GRADIO_PATH = "/gradio";
-
-async function initClient() {
+async function checkModelStatus() {
     try {
-        const { Client } = await import(
-            "https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js"
-        );
-        gradioClient = await Client.connect(GRADIO_CLIENT_URL + GRADIO_PATH);
-        modelStatus.textContent = "MODEL: CONNECTED";
-        modelStatus.style.color = "#00ff41";
-    } catch (e) {
-        console.warn("Gradio client init failed, using fetch fallback:", e);
-        gradioClient = null;
-        modelStatus.textContent = "MODEL: FETCH MODE";
-        modelStatus.style.color = "#ffb000";
+        const resp = await fetch(`${GRADIO_CLIENT_URL}/api/model_status`);
+        if (!resp.ok) return;
+        const status = await resp.json();
+        if (status.available) {
+            modelStatus.textContent = "☘ MODEL: MII-GIIWETA / READY";
+            modelStatus.style.color = "var(--asp-sun)";
+        } else {
+            modelStatus.textContent = "☘ MODEL: GIIZHIK-WIIKI / FALLBACK";
+            modelStatus.style.color = "var(--asp-frost)";
+        }
+    } catch {
+        modelStatus.textContent = "☘ MODEL: ?";
     }
 }
-
 async function apiCall(endpoint, payload) {
-    if (gradioClient) {
-        try {
-            const result = await gradioClient.predict(endpoint, payload);
-            return result.data;
-        } catch (e) {
-            console.warn("Gradio client call failed, falling back to fetch:", e);
-        }
-    }
-    // Fallback: direct fetch to gradio API
-    const resp = await fetch(`${GRADIO_CLIENT_URL}${GRADIO_PATH}/api/${endpoint}`, {
+    // Use the FastAPI clean-JSON endpoints (returns a dict directly).
+    // /api/game/start  -> start_game
+    // /api/game/choice -> make_choice
+    const path = endpoint === "/start_game"
+        ? "/api/game/start"
+        : "/api/game/choice";
+    const resp = await fetch(`${GRADIO_CLIENT_URL}${path}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data: Object.values(payload) })
+        body: JSON.stringify(payload),
     });
-    const json = await resp.json();
-    return json.data;
+    if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}`);
+    }
+    return await resp.json();
 }
 
 // ---------------------------------------------------------------------------
@@ -239,25 +235,8 @@ cmdInput.addEventListener("keydown", (e) => {
     }
 });
 
-// ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
 (async () => {
-    await initClient();
-
-    // Check model status
-    try {
-        const resp = await fetch(`${GRADIO_CLIENT_URL}/api/model_status`);
-        const status = await resp.json();
-        if (status.available) {
-            modelStatus.textContent = "MODEL: READY";
-            modelStatus.style.color = "#00ff41";
-        } else {
-            modelStatus.textContent = "MODEL: FALLBACK";
-            modelStatus.style.color = "#ffb000";
-        }
-    } catch {
-        modelStatus.textContent = "MODEL: UNKNOWN";
-        modelStatus.style.color = "#666";
-    }
+    await checkModelStatus();
 })();
