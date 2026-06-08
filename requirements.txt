@@ -1,0 +1,24 @@
+# CritterCalm — AI Voice Cloning Animal Soother
+# Python 3.10+
+
+# === Core ===
+gradio>=5.0
+numpy>=1.24
+soundfile>=0.12
+torch>=2.0
+
+# === Voice Cloning ===
+omnivoice>=0.1.0
+
+# === LLM Inference (Dolphin-X1-8B) ===
+llama-cpp-python>=0.3.0
+
+# === Fallback TTS ===
+kokoro-onnx>=0.2.0
+
+# === Audio Processing ===
+librosa>=0.10
+scipy>=1.10
+
+# === Utilities ===
+huggingface_hub>=0.20
