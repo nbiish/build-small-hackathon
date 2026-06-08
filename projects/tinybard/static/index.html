@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TinyBard — Micro Text Adventure</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="crt-container">
+        <div class="crt-screen" id="screen">
+            <div class="scanlines"></div>
+            <div class="vignette"></div>
+            
+            <div class="terminal" id="terminal">
+                <div class="terminal-header">
+                    <span class="prompt">TINYBARD v1.0</span>
+                    <span class="status" id="health-bar">HEALTH: <span id="health-val">100</span></span>
+                </div>
+                
+                <div class="terminal-body" id="output">
+                    <div class="boot-sequence" id="boot">
+                        <span class="line">> INITIALIZING NEURAL INTERFACE...</span>
+                        <span class="line">> LOADING NARRATIVE ENGINE...</span>
+                        <span class="line">> CONNECTING TO GRADIO SERVER...</span>
+                        <span class="line success">> CONNECTION ESTABLISHED</span>
+                        <span class="line">> SELECT GENRE TO BEGIN</span>
+                    </div>
+                </div>
+                
+                <div class="genre-selector" id="genre-selector">
+                    <div class="genre-option" data-genre="fantasy">
+                        <span class="icon">⚔</span> FANTASY
+                    </div>
+                    <div class="genre-option" data-genre="scifi">
+                        <span class="icon">🚀</span> SCI-FI
+                    </div>
+                    <div class="genre-option" data-genre="cyberpunk">
+                        <span class="icon">🌆</span> CYBERPUNK
+                    </div>
+                </div>
+                
+                <div class="choices-container" id="choices" style="display: none;">
+                    <!-- Choices injected here -->
+                </div>
+                
+                <div class="input-line" id="input-line" style="display: none;">
+                    <span class="prompt-char">></span>
+                    <input type="text" id="cmd-input" autocomplete="off" spellcheck="false" />
+                    <span class="cursor" id="cursor">_</span>
+                </div>
+                
+                <div class="terminal-footer">
+                    <span>TinyBard | gr.Server + MCP | Llama.cpp</span>
+                    <span id="model-status">MODEL: LOADING...</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="crt-reflection"></div>
+    </div>
+    
+    <script type="module" src="/static/main.js"></script>
+</body>
+</html>
