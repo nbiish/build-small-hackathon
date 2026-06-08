@@ -1,60 +1,61 @@
-# ◈──◆──◇ ANISHINAABE-MOWIN / OBIJWE BUILD SMALL HACKATHON — PRD ◇──◆──◈
+# Build Small Hackathon — PRD
 # Project Requirements Document
 
-> **ᐴ Three Gradio apps targeting all tracks + maximum badges + sponsor prizes. ᔔ**
+> Three Gradio apps targeting all tracks + maximum badges + sponsor prizes.
 > Hack window: June 5-15, 2026. Deadline: June 15.
-> **Aaniin. Miigwech.** — We honor the Anishinaabe-Aki where these apps were built.
+
+> This file is the master PRD and stays English-only. Per-project UIs and
+> READMEs may use additional stylistic content for their own artifacts; this
+> doc does not enumerate those choices.
 
 ---
 
-## ᐴ WAAWIINDAMAAGEWIN ᔔ [OVERVIEW] ◈──◆──◇──◆──◈
+## Overview
 
 - **Name:** Build Small Hackathon 2026 — Team nbiish
-- **Version:** 0.4.0 — Anishinaabe Solarpunk Edition
+- **Version:** 0.4.0 — Cedar-Copper Edition
 - **Description:** Multi-project hackathon entry targeting $48K+ prize pool across Backyard AI and Thousand Token Wood tracks. Three Gradio apps using small models (≤32B) with maximum bonus badge coverage.
-- **Aesthetic:** Anishinaabe Solarpunk — sky-to-sunrise palette (water-blue → cedar → copper → sun-amber → birch-cream), Canadian Aboriginal Syllabics (ᐴ, ᔔ, ☼, ☘, ❀) as section framings, biophilic motifs.
+- **Aesthetic:** Cedar-copper visual language — sky-to-sunrise palette (water-blue → cedar → copper → sun-amber → birch-cream), biophilic motifs, sky-to-water gradient banners. Shared CSS variables live in `shared/cedar_copper_tokens.py`.
 - **Purpose:** Win prizes across tracks, badges, and sponsor categories by building delightful, useful AI apps that run locally.
 - **UX:** Gradio web apps (gr.Blocks + mount_gradio_app custom frontends), hosted on HF Spaces.
-- **Shared tokens module:** `shared/anishinaabe_solarpunk.py` — design tokens reusable across all 3 apps.
 
 ---
 
-## ᐴ WAAJA'INIDIZOWIN ᔔ [RULES] ◈──◆──◇──◆──◈
+## Rules
 
-### ☼ GANAWENDAAGWAD / NAMING & COMMENTS ◈
+### Naming & Comments
 
 - Descriptive project names: CritterCalm, FocusFriend, TinyBard
 - Docstrings on all public functions. Comments on non-obvious logic.
-- Bilingual English + Anishinaabemowin where natural (without appropriation — use Aaniin for greetings, descriptive terms for features).
 
-### ☼ ZHOONIYAA / ALWAYS ◈
+### Always
 
 - Models ≤ 32B total params per project
 - Gradio app hosted as HF Space
 - Local-first (no cloud APIs = Off the Grid badge)
 - GGUF quantized models for local inference
 - Python 3.10+ with pinned requirements
-- Anishinaabe Solarpunk aesthetic consistency across all UIs
+- Cedar-copper aesthetic consistency across all UIs (palette tokens in `shared/cedar_copper_tokens.py`)
 
-### ☼ GIGAANAN / NEVER ◈
+### Never
 
 - Cloud API calls in production path
 - Hardcoded secrets or API keys
 - Models > 32B params
 - Default Gradio look without customization attempt
 
-### ☼ INA-ENDAWAAZOWINAN / IF ◈
+### If
 
-- If custom frontend is feasible → use mount_gradio_app for Off-Brand badge
+- If custom frontend is feasible → use `mount_gradio_app` for Off-Brand badge
 - If model ≤ 4B → tag Tiny Titan eligible
 - If using llama.cpp runtime → tag Llama Champion
 - If fine-tuning is done → publish model to HF Hub
 
 ---
 
-## ᐴ NITAM-AABAJICHIGANAN ᔔ [INFRASTRUCTURE] ◈──◆──◇──◆──◈
+## Infrastructure
 
-### ☼ GRADIO 6.0 + MCP SERVER ◈
+### Gradio 6.0 + MCP Server
 
 - `gradio.Server` is **NOT** in Gradio 6.0 stable. Use `mount_gradio_app(fastapi_app, blocks, path="/gradio")` instead.
 - MCP server mode: `demo.launch(mcp_server=True)` or `GRADIO_MCP_SERVER=true` env var.
@@ -63,15 +64,16 @@
 - Theme parameters: `css`, `head`, `theme` moved from `gr.Blocks(...)` to `app.launch(...)` in Gradio 6.0.
 - Chatbot API: Gradio 6.0 requires `{"role": "user|assistant", "content": "..."}` dicts (not tuples).
 
-### ☼ HF AGENTS CLI ◈
+### HF Agents CLI
 
 - `hf` CLI is installed (v1.18.0). See `skill://hf-cli` for full command reference.
 - Install expert skills: `hf skills add --global` or `hf skills add --claude --global`.
 - Spaces managed via: `hf repos create <name> --type space --space-sdk gradio --public`.
 - Deploy: `git remote add hf https://huggingface.co/spaces/<user>/<space>` then `git push hf main`.
 - HF README metadata: `colorTo` must be one of `[red, yellow, green, blue, indigo, purple, pink, gray]` (no `emerald`/`amber`).
+- HF README metadata: `emoji` must match `/\p{Extended_Pictographic}/u` — only the standard emoji block is allowed; decorative Unicode glyphs (solar/astrological/typographic symbols) fail validation. Use a real emoji.
 
-### ☼ ZHOONIYAAWICHIGEWIN / LOCAL TEST ENVIRONMENT ◈
+### Local Test Environment
 
 - Python: miniconda3 (Python 3.12)
 - Gradio: 6.0.0
@@ -82,7 +84,7 @@
   - LFM2-8B-A1B-Q4_K_M.gguf (in ggufy/models/)
 - Missing GGUF models (need download): Gemma 4 12B, Dolphin-X1-8B
 
-### ☼ AABAJICHIGANAN / LOCAL SERVERS ◈
+### Local Servers
 
 All 3 apps run simultaneously on different ports for visual inspection:
 
@@ -94,20 +96,20 @@ All 3 apps run simultaneously on different ports for visual inspection:
 
 ---
 
-## ᐴ INA-WAABANDA'IWEWINAN ᔔ [PROJECTS] ◈──◆──◇──◆──◈
+## Projects
 
-### ☼ 1. CRITTERCALM — Maanamewin / Voice-Comfort for the Four-Leggeds ◈
+### 1. CritterCalm (Backyard AI)
 
-- **Status:** Code complete. Deployed. Locally tested. Anishinaabe-Solarpunk UI applied.
+- **Status:** Code complete. Deployed. Locally tested. Cedar-copper UI applied.
 - **Stack:** OmniVoice (0.6B) + Dolphin-X1-8B (8B) + Kokoro TTS (82M) = 8.7B params
 - **Badges:** Off the Grid, Well-Tuned (TBD), Field Notes, Llama Champion (TBD), Off-Brand (custom banner)
 - **GitHub:** github.com/nbiish/crittercalm
 - **HF Space:** huggingface.co/spaces/nbiish/crittercalm
 - **Standalone repo:** /Volumes/1tb-sandisk/code-external/crittercalm-repo
 
-### ☼ 2. FOCUSFRIEND — Pip, your cedar-and-sun companion on the lake ◈
+### 2. FocusFriend (Thousand Token Wood)
 
-- **Status:** Code complete. Deployed. Locally tested. Anishinaabe-Solarpunk UI applied. Gradio 6 Chatbot dict-format fixed.
+- **Status:** Code complete. Deployed. Locally tested. Cedar-copper UI applied. Gradio 6 Chatbot dict-format fixed.
 - **Stack:** Gemma 4 12B (12B) via llama-cpp-python
 - **Badges:** Off-Brand (sun-amber custom theme), Off the Grid, Field Notes
 - **GitHub:** github.com/nbiish/focusfriend
@@ -115,13 +117,12 @@ All 3 apps run simultaneously on different ports for visual inspection:
 - **Standalone repo:** /Volumes/1tb-sandisk/code-external/focusfriend-repo
 - **Note:** Gemma 4 12B GGUF not yet downloaded. Need `huggingface-cli download unsloth/gemma-4-12b-it-GGUF --include "gemma-4-12b-it-Q4_K_M.gguf" --local-dir ./models`
 
-### ☼ 3. TINYBARD — Aanishinaabe Mikinaak-Aki / Fire-Fly Storyteller ◈
+### 3. TinyBard (Thousand Token Wood + Tiny Titan + Llama Champion)
 
-- **Status:** Code complete. Deployed. Locally tested end-to-end (game loop). Anishinaabe-Solarpunk CRT UI applied.
+- **Status:** Code complete. Deployed. Locally tested end-to-end (game loop). Cedar-copper CRT UI applied.
 - **Concept:** ≤4B LLM generates 5-min interactive text adventures in a CRT terminal aesthetic.
 - **Stack:** VibeThinker 1.5B (1.5B) via llama-cpp-python + procedural fallback engine
 - **Architecture:** FastAPI + mount_gradio_app at /gradio. Custom HTML/CSS/JS frontend. MCP tools: start_game, make_choice.
-- **Bilingual UI labels:** NOOSISKAAZOWIN (health), MII-GIIWETA (connected), AADIZOOKAAN (fantasy), ISHPIMING (sci-fi), MASHKODEWAAZIBI (cyberpunk).
 - **Badges:** Llama Champion, Tiny Titan (1.5B < 4B), Off-Brand (custom CRT), Off the Grid, Field Notes
 - **Prize targets:** Tiny Titan ($1K), Thousand Token Wood track, Bonus Quest Champion potential
 - **GitHub:** github.com/nbiish/tinybard
@@ -130,13 +131,12 @@ All 3 apps run simultaneously on different ports for visual inspection:
 
 ---
 
-## ᐴ INAABAJICHIGANAN ᔔ [TODO] ◈──◆──◇──◆──◈
+## TODO
 
 > Keep tasks atomic and testable.
 
-### ☼ MAAJITAAWIN / IN PROGRESS ◈
+### In Progress
 
-- [x] ~~Download Gemma 4 12B and Dolphin-X1-8B GGUF models~~ → blocked: not yet in dev plan
 - [ ] Test CritterCalm voice cloning pipeline end-to-end
 - [ ] Test FocusFriend all 4 modes (Chat, Focus, Breathe, Meditate) with real model
 - [ ] Record demo videos (2-3 min each)
@@ -144,10 +144,10 @@ All 3 apps run simultaneously on different ports for visual inspection:
 - [ ] Write Field Notes blog posts (3 — one per project)
 - [ ] Share agent traces to HF Hub (Sharing is Caring badge)
 
-### ☼ GIIZHIITAA / COMPLETED ◈
+### Completed
 
-- [x] CritterCalm v1 code complete (11 files) — Anishinaabe-Solarpunk UI
-- [x] FocusFriend v1 code complete (16 files) — Anishinaabe-Solarpunk UI + Gradio 6 dict Chatbot
+- [x] CritterCalm v1 code complete (11 files) — Cedar-copper UI
+- [x] FocusFriend v1 code complete (16 files) — Cedar-copper UI + Gradio 6 dict Chatbot
 - [x] TinyBard v1 code complete (8 files) — LLM + procedural fallback, CRT UI, clean FastAPI JSON
 - [x] GitHub repos created (nbiish/crittercalm, nbiish/focusfriend, nbiish/tinybard)
 - [x] HF Spaces created and deployed (all 3)
@@ -163,27 +163,22 @@ All 3 apps run simultaneously on different ports for visual inspection:
 
 ---
 
-## ᐴ NITAAM-AADIZOOKAAN ᔔ [SHORT-TERM GOALS] ◈──◆──◇──◆──◈
+## Short-term Goals
 
 - Test all 3 apps locally with real GGUF models (currently running with procedural fallbacks)
 - Record demo videos and post to social media
 - Write and publish Field Notes blog posts
 - Share agent traces for Sharing is Caring badge
-- Sync aesthetic updates to standalone GitHub repos + HF Spaces (push)
+- Polish UIs for demo appeal
 
 ---
 
-## ᐴ INA-WAABANDA'IWEWIN ᔔ [REFERENCE] ◈──◆──◇──◆──◈
+## Reference
 
 - CritterCalm: projects/crittercalm/ + github.com/nbiish/crittercalm
 - FocusFriend: projects/focusfriend/ + github.com/nbiish/focusfriend
 - TinyBard: projects/tinybard/ + github.com/nbiish/tinybard
-- Aesthetic module: shared/anishinaabe_solarpunk.py
+- Aesthetic module: shared/cedar_copper_tokens.py
 - ML Intern: github.com/huggingface/ml-intern
 - HF Agents CLI: huggingface.co/docs/hub/en/agents-cli
 - Gradio MCP: gradio.app/guides/model-context-protocol
-- Anishinaabe-Solarpunk styling guide: skill://anishinaabe-cyberpunk-style
-
----
-
-◈──◆──◇ ☼ Anishinaabe Solarpunk Edition · Cedar Edition · v0.4.0 ◇──◆──◈
