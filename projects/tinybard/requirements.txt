@@ -1,0 +1,7 @@
+# TinyBard — Micro Text Adventure Generator
+# Python 3.10+
+
+gradio>=5.0
+numpy>=1.24
+llama-cpp-python>=0.3.0
+huggingface_hub>=0.20
