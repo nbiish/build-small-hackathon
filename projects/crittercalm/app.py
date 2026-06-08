@@ -435,56 +435,135 @@ def get_model_status() -> str:
 # ---------------------------------------------------------------------------
 
 CUSTOM_CSS = """
+/* =========================================================================
+   CritterCalm — Anishinaabe Solarpunk Theme
+   ----------------------------------------------------------------------------
+   Your pet's voice from the meadow. Sun, water, moss, and the small winds.
+   ========================================================================= */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600&family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap');
+
 :root {
-    --primary: #4a7c59;
-    --primary-light: #6b9e78;
-    --bg: #f5f0e8;
-    --card: #faf7f2;
-    --text: #3d3226;
-    --accent: #8b6914;
-    --border: #d4c9b5;
-    --warm: #e8c56d;
+    /* Anishinaabe-Solarpunk palette */
+    --asp-sky:       #5BA4D9;
+    --asp-water:     #1B4965;
+    --asp-ice:       #BEE9E8;
+    --asp-frost:     #CAF0F8;
+    --asp-sun:       #F2A93B;
+    --asp-sunlight:  #FFB347;
+    --asp-ember:     #E76F51;
+    --asp-birch:     #F5F1E8;
+    --asp-terra:     #C8553D;
+    --asp-earth:     #8B3A1F;
+    --asp-moss:      #588157;
+    --asp-forest:    #3D6A4A;
+    --asp-spruce:    #1B4332;
+    --asp-night:     #0F1A2C;
+    --asp-ash:       #3A2A2A;
+    --asp-stone:     #A89F91;
+
+    /* Legacy aliases for downstream code */
+    --primary:       var(--asp-moss);
+    --primary-light: var(--asp-sunlight);
+    --bg:            var(--asp-night);
+    --card:          #142a3a;
+    --text:          var(--asp-birch);
+    --accent:        var(--asp-sun);
+    --border:        rgba(91, 164, 217, 0.3);
+    --warm:          var(--asp-sunlight);
 }
-.gradio-container {
-    background: var(--bg) !important;
-    font-family: 'Georgia', 'Times New Roman', serif !important;
+
+body, .gradio-container {
+    background:
+        radial-gradient(ellipse at top, rgba(91, 164, 217, 0.18) 0%, transparent 60%),
+        radial-gradient(ellipse at bottom, rgba(27, 73, 50, 0.25) 0%, transparent 70%),
+        var(--asp-night) !important;
     color: var(--text) !important;
+    font-family: 'Inter', system-ui, sans-serif !important;
+    max-width: 100% !important;
+    background-attachment: fixed;
 }
-h1, h2, h3 {
-    color: var(--primary) !important;
+h1, h2, h3, h4 {
+    font-family: 'EB Garamond', 'Iowan Old Style', Georgia, serif !important;
+    color: var(--accent) !important;
     font-weight: 700 !important;
+    text-shadow: 0 0 20px rgba(242, 169, 59, 0.18);
 }
+
 .tab-nav button {
     background: var(--card) !important;
     border: 1px solid var(--border) !important;
     color: var(--text) !important;
     font-size: 1.1em !important;
     padding: 12px 24px !important;
+    transition: all 0.2s !important;
+}
+.tab-nav button:hover {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 16px rgba(242, 169, 59, 0.25);
 }
 .tab-nav button.selected {
-    background: var(--primary) !important;
-    color: white !important;
-    border-color: var(--primary) !important;
+    background: linear-gradient(95deg, var(--asp-sun) 0%, var(--asp-sunlight) 100%) !important;
+    color: var(--asp-night) !important;
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 18px rgba(242, 169, 59, 0.35);
 }
+
 button.primary {
-    background: var(--primary) !important;
+    background: linear-gradient(95deg, var(--asp-sun) 0%, var(--asp-sunlight) 100%) !important;
     border: none !important;
-    color: white !important;
+    color: var(--asp-night) !important;
     font-weight: 600 !important;
     padding: 12px 28px !important;
     border-radius: 8px !important;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: all 0.2s !important;
 }
 button.primary:hover {
-    background: var(--primary-light) !important;
+    background: linear-gradient(95deg, var(--asp-sunlight) 0%, var(--asp-birch) 100%) !important;
+    box-shadow: 0 0 20px rgba(242, 169, 59, 0.5);
+    transform: translateY(-1px);
 }
+
 .animal-emoji {
     font-size: 2em;
+    filter: drop-shadow(0 0 6px rgba(242, 169, 59, 0.4));
 }
 .model-status {
     background: var(--card) !important;
     border: 1px solid var(--border) !important;
     border-radius: 8px !important;
     padding: 16px !important;
+    color: var(--text) !important;
+}
+
+footer { display: none !important; }
+
+/* === ASP Banner ====================================================== */
+.asp-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6em;
+    padding: 14px 18px;
+    margin-bottom: 18px;
+    background: linear-gradient(95deg, var(--asp-sky) 0%, var(--asp-water) 100%);
+    color: var(--asp-birch);
+    border-bottom: 1px solid rgba(255, 179, 71, 0.35);
+    border-radius: 10px;
+    font-family: 'EB Garamond', Georgia, serif;
+    letter-spacing: 0.5px;
+    text-shadow: 0 1px 2px rgba(15, 26, 44, 0.45);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+}
+.asp-banner .syll { font-size: 1.5em; opacity: 0.9; }
+.asp-banner .title { font-size: 1.1em; font-weight: 600; }
+.asp-banner .glyph { color: var(--asp-sunlight); }
+.asp-banner .subtitle {
+    color: var(--asp-frost);
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.92;
 }
 """
 
@@ -492,24 +571,26 @@ button.primary:hover {
 def create_app() -> gr.Blocks:
     """Build the CritterCalm Gradio application."""
     with gr.Blocks(
-        css=CUSTOM_CSS,
-        title="CritterCalm — AI Voice Cloning Animal Soother",
-        theme=gr.themes.Soft(
-            primary_hue="green",
-            neutral_hue="stone",
-        ),
+        title="CritterCalm — Maanamewin / Voice Comfort for Pets",
     ) as app:
-        gr.Markdown(
-            """
-            # 🐾  CritterCalm
-            ### Clone your voice. Calm your pets.
-
-            Ever notice how your dog settles down when you talk to them? Or how your cat
-            purrs when they hear your voice? Animals respond to their person's voice —
-            it's their ultimate comfort signal. **CritterCalm** clones your voice so your
-            pets can hear you even when you're away.
-            """
-        )
+        # Anishinaabe-Solarpunk banner
+        gr.HTML("""
+        <div class="asp-banner">
+            <span class="syll">ᐴ</span>
+            <span class="glyph">☼</span>
+            <span class="title">CRITTERCALM</span>
+            <span class="glyph">❀</span>
+            <span class="subtitle">— Maanamewin: voice-comfort for the four-leggeds —</span>
+            <span class="syll">ᔔ</span>
+        </div>
+        <h3 style="text-align:center; font-style:italic; color: var(--text); margin-top:0; margin-bottom:20px; opacity: 0.85;">
+            Clone your voice. Calm your companion. Even across distance.
+        </h3>
+        <p style="text-align:center; max-width:680px; margin: 0 auto 24px; color: var(--text); line-height:1.6;">
+            Animals respond to their person&apos;s voice — it&apos;s their ultimate comfort signal.
+            <strong>CritterCalm</strong> clones your voice locally so your pet can hear you even when you&apos;re away.
+        </p>
+        """)
 
         # Model status accordion
         with gr.Accordion("🔧  Model Status", open=False):
@@ -729,7 +810,9 @@ if __name__ == "__main__":
     app = create_app()
     app.launch(
         server_name="0.0.0.0",
-        server_port=int(os.environ.get("PORT", 7860)),
+        server_port=int(os.environ.get("PORT", "7860")),
         share=False,
         show_error=True,
+        mcp_server=True,
+        css=CUSTOM_CSS,
     )

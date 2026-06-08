@@ -1,15 +1,43 @@
-/* TinyBard CRT Terminal Theme */
+/* =========================================================================
+   TinyBard — Anishinaabe Solarpunk CRT Terminal
+   ----------------------------------------------------------------------------
+   A retro CRT terminal reinterpreted through Anishinaabe + Solarpunk lenses.
+   Phosphor glow becomes "fire-fly light"; scanlines become "birch-bark rings";
+   the cabinet's amber becomes rising sun; the screen is the lake (Gichigami)
+   at dusk, framed in cedar and copper.
+   ========================================================================= */
 
+/* === ANISHINAABE-SOLARPUNK DESIGN TOKENS ============================== */
 :root {
-    --green: #00ff41;
-    --green-dim: #00aa2a;
-    --green-dark: #004d13;
-    --green-glow: rgba(0, 255, 65, 0.15);
-    --amber: #ffb000;
-    --red: #ff0040;
-    --bg: #0a0a0a;
-    --terminal-bg: #0d1117;
-    --scanline-opacity: 0.03;
+    /* Solarpunk palette */
+    --asp-sky:       #5BA4D9;
+    --asp-water:     #1B4965;
+    --asp-ice:       #BEE9E8;
+    --asp-frost:     #CAF0F8;
+    --asp-sun:       #F2A93B;
+    --asp-sunlight:  #FFB347;
+    --asp-ember:     #E76F51;
+    --asp-birch:     #F5F1E8;
+    --asp-terra:     #C8553D;
+    --asp-earth:     #8B3A1F;
+    --asp-moss:      #588157;
+    --asp-forest:    #3D6A4A;
+    --asp-spruce:    #1B4332;
+    --asp-night:     #0F1A2C;
+    --asp-ash:       #3A2E2A;
+    --asp-stone:     #A89F91;
+    --asp-ink:       #1A1F2E;
+
+    /* CRT / terminal legacy (re-anchored to solarpunk palette) */
+    --green:       var(--asp-sun);       /* phosphor -> rising sun amber */
+    --green-dim:   #C97F1E;              /* dim sun */
+    --green-dark:  #5E3A0E;              /* cedar-bark */
+    --green-glow:  rgba(242, 169, 59, 0.18);
+    --amber:       var(--asp-sunlight);
+    --red:         var(--asp-ember);
+    --bg:          var(--asp-night);
+    --terminal-bg: linear-gradient(160deg, #0F1A2C 0%, #1A2A1F 100%);
+    --scanline-opacity: 0.04;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -20,43 +48,99 @@
 }
 
 body {
-    background: var(--bg);
+    background:
+        radial-gradient(ellipse at top, #1B4965 0%, transparent 60%),
+        radial-gradient(ellipse at bottom right, #1B4332 0%, transparent 70%),
+        var(--bg);
     font-family: 'MonoFallback', monospace;
-    color: var(--green);
+    color: var(--asp-birch);
     min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+/* === ANISHINAABE-SOLARPUNK BANNER ===================================== */
+.asp-banner {
+    width: 90vw;
+    max-width: 900px;
     display: flex;
     align-items: center;
     justify-content: center;
-    overflow: hidden;
+    gap: 0.7em;
+    padding: 12px 18px;
+    margin-top: 18px;
+    background: linear-gradient(95deg, var(--asp-sky) 0%, var(--asp-water) 100%);
+    color: var(--asp-birch);
+    border: 1px solid rgba(255, 179, 71, 0.3);
+    border-radius: 10px 10px 0 0;
+    font-family: Georgia, 'Iowan Old Style', serif;
+    letter-spacing: 0.5px;
+    text-shadow: 0 1px 2px rgba(15, 26, 44, 0.45);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+.asp-banner .syll { font-size: 1.5em; opacity: 0.9; }
+.asp-banner .title { font-size: 1.05em; font-weight: 600; }
+.asp-banner .glyph {
+    display: inline-block;
+    transform: translateY(-1px);
+    font-size: 1.15em;
+    color: var(--asp-sunlight);
+}
+.asp-banner .subtitle {
+    color: var(--asp-frost);
+    font-size: 0.85em;
+    font-style: italic;
+    opacity: 0.85;
 }
 
-/* CRT Monitor Container */
+/* === CRT MONITOR (cedar-copper cabinet) ================================ */
 .crt-container {
     width: 90vw;
     max-width: 900px;
-    height: 85vh;
-    max-height: 700px;
+    height: 75vh;
+    max-height: 660px;
     position: relative;
-    background: #1a1a2e;
-    border-radius: 30px;
-    padding: 25px;
+    background:
+        linear-gradient(180deg, #8B3A1F 0%, #5E2710 100%);
+    border-radius: 18px 18px 30px 30px;
+    padding: 22px;
     box-shadow:
-        0 0 80px rgba(0, 255, 65, 0.08),
+        0 0 80px rgba(91, 164, 217, 0.12),
         inset 0 0 60px rgba(0, 0, 0, 0.5),
         0 20px 60px rgba(0, 0, 0, 0.8);
 }
+
+/* decorative bezel rivets — medicine wheel */
+.crt-container::before,
+.crt-container::after {
+    content: "◈";
+    position: absolute;
+    top: 8px;
+    color: var(--asp-sunlight);
+    opacity: 0.6;
+    font-size: 0.9em;
+}
+.crt-container::before { left: 12px; }
+.crt-container::after { right: 12px; }
 
 .crt-screen {
     width: 100%;
     height: 100%;
     background: var(--terminal-bg);
-    border-radius: 15px;
+    border-radius: 12px;
     overflow: hidden;
     position: relative;
-    border: 2px solid #222;
+    border: 2px solid #1B4332;
+    box-shadow:
+        inset 0 0 80px rgba(27, 73, 50, 0.5),
+        inset 0 0 4px rgba(255, 179, 71, 0.2);
 }
 
-/* Scanlines overlay */
+/* Scanlines — birch-bark rings reinterpreted */
 .scanlines {
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
@@ -64,23 +148,28 @@ body {
         0deg,
         transparent,
         transparent 2px,
-        rgba(0, 0, 0, var(--scanline-opacity)) 2px,
-        rgba(0, 0, 0, var(--scanline-opacity)) 4px
+        rgba(91, 164, 217, var(--scanline-opacity)) 2px,
+        rgba(91, 164, 217, var(--scanline-opacity)) 4px
     );
     pointer-events: none;
     z-index: 10;
 }
 
-/* Vignette effect */
+/* Vignette — horizon glow */
 .vignette {
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
-    background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.4) 100%);
+    background: radial-gradient(
+        ellipse at 50% 30%,
+        rgba(242, 169, 59, 0.05) 0%,
+        transparent 50%,
+        rgba(15, 26, 44, 0.55) 100%
+    );
     pointer-events: none;
     z-index: 10;
 }
 
-/* CRT reflection/glare */
+/* CRT reflection/glare — frost on glass */
 .crt-reflection {
     position: absolute;
     top: 5%;
@@ -89,7 +178,7 @@ body {
     height: 30%;
     background: linear-gradient(
         135deg,
-        rgba(255, 255, 255, 0.03) 0%,
+        rgba(190, 233, 232, 0.05) 0%,
         transparent 100%
     );
     pointer-events: none;
@@ -97,7 +186,7 @@ body {
     border-radius: 50%;
 }
 
-/* Terminal Layout */
+/* === TERMINAL LAYOUT ================================================== */
 .terminal {
     width: 100%;
     height: 100%;
@@ -106,6 +195,7 @@ body {
     padding: 15px 20px;
     position: relative;
     z-index: 5;
+    color: var(--asp-birch);
 }
 
 .terminal-header {
@@ -113,118 +203,130 @@ body {
     justify-content: space-between;
     align-items: center;
     padding-bottom: 10px;
-    border-bottom: 1px solid var(--green-dark);
+    border-bottom: 1px solid rgba(91, 164, 217, 0.3);
     margin-bottom: 10px;
     font-size: 0.75rem;
-    color: var(--green-dim);
+    color: var(--asp-frost);
     text-transform: uppercase;
     letter-spacing: 2px;
+    font-family: Georgia, serif;
 }
+.terminal-header .status {
+    color: var(--asp-sunlight);
+    text-shadow: 0 0 8px rgba(242, 169, 59, 0.35);
+}
+#health-val { color: var(--asp-sun); font-weight: bold; }
 
-.terminal-header .status { color: var(--amber); }
-#health-val { color: var(--green); font-weight: bold; }
-
-/* Terminal output area */
+/* === TERMINAL OUTPUT ================================================== */
 .terminal-body {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
     padding-right: 10px;
-    font-size: 0.85rem;
-    line-height: 1.6;
-    text-shadow: 0 0 5px var(--green-glow);
+    font-size: 0.88rem;
+    line-height: 1.65;
+    text-shadow: 0 0 6px rgba(242, 169, 59, 0.15);
     scroll-behavior: smooth;
 }
-
 .terminal-body::-webkit-scrollbar { width: 6px; }
 .terminal-body::-webkit-scrollbar-track { background: transparent; }
 .terminal-body::-webkit-scrollbar-thumb {
-    background: var(--green-dark);
+    background: rgba(91, 164, 217, 0.3);
     border-radius: 3px;
 }
 
-/* Text styles */
 .line {
     display: block;
     margin-bottom: 3px;
     opacity: 0;
     animation: typeIn 0.5s forwards;
 }
-.line.success { color: var(--green); }
-.line.error { color: var(--red); }
-.line.amber { color: var(--amber); }
+.line.success { color: var(--asp-sunlight); }
+.line.error { color: var(--asp-ember); }
+.line.amber { color: var(--asp-sun); }
 
 .story-text {
     display: block;
-    margin: 12px 0;
-    padding: 10px 15px;
-    border-left: 2px solid var(--green-dim);
-    background: rgba(0, 255, 65, 0.03);
+    margin: 14px 0;
+    padding: 12px 16px;
+    border-left: 2px solid var(--asp-sun);
+    background: rgba(91, 164, 217, 0.06);
+    border-radius: 0 4px 4px 0;
     white-space: pre-wrap;
+    color: var(--asp-birch);
     animation: fadeSlideIn 0.6s ease-out;
+    box-shadow: inset 0 0 20px rgba(15, 26, 44, 0.3);
 }
 
 .narrator-prefix {
-    color: var(--amber);
+    color: var(--asp-sun);
     font-weight: bold;
+    text-shadow: 0 0 8px rgba(242, 169, 59, 0.4);
 }
 
 .player-action {
     display: block;
-    color: var(--green-dim);
+    color: var(--asp-frost);
     margin: 5px 0;
     font-style: italic;
+    border-left: 2px dashed rgba(190, 233, 232, 0.4);
+    padding-left: 8px;
 }
 
 .game-over-win {
-    color: var(--green);
-    text-shadow: 0 0 20px var(--green);
-    font-size: 1.1rem;
+    color: var(--asp-sunlight);
+    text-shadow: 0 0 20px rgba(255, 179, 71, 0.6);
+    font-size: 1.15rem;
     text-align: center;
     padding: 20px;
     animation: pulse 2s infinite;
+    font-family: Georgia, serif;
 }
 
 .game-over-lose {
-    color: var(--red);
-    text-shadow: 0 0 20px var(--red);
-    font-size: 1.1rem;
+    color: var(--asp-ember);
+    text-shadow: 0 0 20px rgba(231, 111, 81, 0.5);
+    font-size: 1.15rem;
     text-align: center;
     padding: 20px;
     animation: pulse 2s infinite;
+    font-family: Georgia, serif;
 }
 
-/* Genre selector */
+/* === GENRE SELECTOR =================================================== */
 .genre-selector {
     display: flex;
     gap: 15px;
     padding: 15px 0;
     justify-content: center;
+    flex-wrap: wrap;
 }
 
 .genre-option {
     padding: 12px 25px;
-    border: 1px solid var(--green-dark);
+    border: 1px solid rgba(91, 164, 217, 0.4);
     border-radius: 4px;
     cursor: pointer;
     transition: all 0.2s;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 1.5px;
     font-size: 0.8rem;
-    color: var(--green-dim);
+    color: var(--asp-frost);
+    background: rgba(15, 26, 44, 0.4);
 }
 
 .genre-option:hover {
-    background: var(--green-dark);
-    color: var(--green);
-    border-color: var(--green);
-    text-shadow: 0 0 10px var(--green);
-    box-shadow: 0 0 15px rgba(0, 255, 65, 0.2);
+    background: linear-gradient(95deg, rgba(242, 169, 59, 0.2) 0%, rgba(91, 164, 217, 0.2) 100%);
+    color: var(--asp-sunlight);
+    border-color: var(--asp-sun);
+    text-shadow: 0 0 12px rgba(242, 169, 59, 0.6);
+    box-shadow: 0 0 18px rgba(242, 169, 59, 0.3);
+    transform: translateY(-1px);
 }
 
-.genre-option .icon { margin-right: 8px; font-size: 1rem; }
+.genre-option .icon { margin-right: 8px; font-size: 1.1em; color: var(--asp-sun); }
 
-/* Choice buttons */
+/* === CHOICE BUTTONS =================================================== */
 .choices-container {
     display: flex;
     flex-direction: column;
@@ -235,160 +337,164 @@ body {
 .choice-btn {
     display: block;
     padding: 10px 15px;
-    border: 1px solid var(--green-dark);
+    border: 1px solid rgba(91, 164, 217, 0.4);
     border-radius: 3px;
     background: transparent;
-    color: var(--green-dim);
+    color: var(--asp-frost);
     font-family: 'MonoFallback', monospace;
-    font-size: 0.8rem;
+    font-size: 0.82rem;
     cursor: pointer;
     text-align: left;
     transition: all 0.15s;
-    text-shadow: 0 0 3px var(--green-glow);
+    text-shadow: 0 0 3px rgba(91, 164, 217, 0.25);
 }
 
 .choice-btn:hover {
-    background: rgba(0, 255, 65, 0.08);
-    border-color: var(--green);
-    color: var(--green);
+    background: rgba(91, 164, 217, 0.1);
+    border-color: var(--asp-sun);
+    color: var(--asp-sunlight);
     padding-left: 25px;
+    box-shadow: 0 0 12px rgba(242, 169, 59, 0.2);
 }
 
 .choice-btn::before {
-    content: '> ';
-    color: var(--amber);
+    content: '☼ ';
+    color: var(--asp-sun);
+    margin-right: 4px;
 }
 
-/* Input line */
+/* === INPUT LINE ======================================================= */
 .input-line {
     display: flex;
     align-items: center;
     padding: 10px 0 5px;
-    border-top: 1px solid var(--green-dark);
+    border-top: 1px solid rgba(91, 164, 217, 0.3);
     margin-top: 5px;
 }
 
 .prompt-char {
-    color: var(--amber);
+    color: var(--asp-sun);
     margin-right: 8px;
     font-weight: bold;
+    text-shadow: 0 0 8px rgba(242, 169, 59, 0.5);
 }
 
 #cmd-input {
     flex: 1;
     background: transparent;
     border: none;
-    color: var(--green);
+    color: var(--asp-birch);
     font-family: 'MonoFallback', monospace;
-    font-size: 0.85rem;
+    font-size: 0.88rem;
     outline: none;
     caret-color: transparent;
 }
 
 .cursor {
-    color: var(--green);
+    color: var(--asp-sun);
+    text-shadow: 0 0 6px rgba(242, 169, 59, 0.6);
     animation: blink 0.8s step-end infinite;
 }
 
-/* Terminal footer */
+/* === TERMINAL FOOTER ================================================== */
 .terminal-footer {
     display: flex;
     justify-content: space-between;
     padding-top: 8px;
-    border-top: 1px solid #1a1a2e;
+    border-top: 1px solid rgba(91, 164, 217, 0.2);
     margin-top: 8px;
     font-size: 0.65rem;
-    color: #444;
-    letter-spacing: 1px;
+    color: var(--asp-stone);
+    letter-spacing: 1.5px;
 }
 
-#model-status { color: var(--green-dark); }
+#model-status { color: var(--asp-moss); }
 
-/* Health bar visual */
+/* === HEALTH BAR ====================================================== */
 .health-bar-visual {
     width: 100%;
     height: 4px;
-    background: #1a1a2e;
+    background: rgba(15, 26, 44, 0.6);
     border-radius: 2px;
     margin-top: 5px;
     overflow: hidden;
+    border: 1px solid rgba(91, 164, 217, 0.3);
 }
 
 .health-bar-fill {
     height: 100%;
-    background: var(--green);
+    background: linear-gradient(90deg, var(--asp-sun) 0%, var(--asp-sunlight) 100%);
     transition: width 0.5s ease, background-color 0.5s;
     border-radius: 2px;
+    box-shadow: 0 0 8px rgba(242, 169, 59, 0.5);
 }
 
-.health-bar-fill.low { background: var(--red); }
-.health-bar-fill.mid { background: var(--amber); }
+.health-bar-fill.low { background: linear-gradient(90deg, var(--asp-ember) 0%, var(--asp-terra) 100%); }
+.health-bar-fill.mid { background: linear-gradient(90deg, var(--asp-sun) 0%, var(--asp-amber, #FFB347) 100%); }
 
-/* New game button */
+/* === NEW GAME BUTTON ================================================= */
 .new-game-btn {
     display: inline-block;
-    padding: 8px 20px;
-    border: 1px solid var(--green-dark);
+    padding: 10px 22px;
+    border: 1px solid rgba(91, 164, 217, 0.4);
     border-radius: 3px;
     background: transparent;
-    color: var(--green-dim);
+    color: var(--asp-frost);
     font-family: 'MonoFallback', monospace;
-    font-size: 0.75rem;
+    font-size: 0.78rem;
     cursor: pointer;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 1.5px;
     margin-top: 10px;
     transition: all 0.2s;
 }
 
 .new-game-btn:hover {
-    background: var(--green-dark);
-    color: var(--green);
-    border-color: var(--green);
+    background: linear-gradient(95deg, rgba(242, 169, 59, 0.2) 0%, rgba(91, 164, 217, 0.2) 100%);
+    color: var(--asp-sunlight);
+    border-color: var(--asp-sun);
+    box-shadow: 0 0 16px rgba(242, 169, 59, 0.35);
 }
 
-/* Animations */
+/* === ANIMATIONS ====================================================== */
 @keyframes typeIn {
     from { opacity: 0; transform: translateY(5px); }
     to { opacity: 1; transform: translateY(0); }
 }
-
 @keyframes fadeSlideIn {
     from { opacity: 0; transform: translateX(-10px); }
     to { opacity: 1; transform: translateX(0); }
 }
-
 @keyframes blink {
     50% { opacity: 0; }
 }
-
 @keyframes pulse {
     0%, 100% { opacity: 1; }
-    50% { opacity: 0.6; }
+    50% { opacity: 0.65; }
 }
 
-/* Flicker effect on load */
+/* CRT power-on (sun rising) */
 .crt-screen {
-    animation: crtOn 0.5s ease-out;
+    animation: sunRise 0.7s ease-out;
+}
+@keyframes sunRise {
+    0%   { opacity: 0; transform: scaleY(0.01); box-shadow: inset 0 0 0 rgba(242, 169, 59, 0); }
+    40%  { opacity: 1; transform: scaleY(0.01); }
+    60%  { transform: scaleY(1.05); }
+    80%  { transform: scaleY(0.98); }
+    100% { transform: scaleY(1); box-shadow: inset 0 0 80px rgba(27, 73, 50, 0.5); }
 }
 
-@keyframes crtOn {
-    0% { opacity: 0; transform: scaleY(0.01); }
-    40% { opacity: 1; transform: scaleY(0.01); }
-    60% { transform: scaleY(1.05); }
-    80% { transform: scaleY(0.98); }
-    100% { transform: scaleY(1); }
-}
-
-/* Mobile responsive */
+/* === MOBILE ========================================================== */
 @media (max-width: 600px) {
     .crt-container {
         width: 95vw;
-        height: 90vh;
+        height: 78vh;
         padding: 12px;
-        border-radius: 15px;
+        border-radius: 14px;
     }
     .genre-selector { flex-direction: column; gap: 8px; }
     .genre-option { text-align: center; }
-    .terminal-body { font-size: 0.75rem; }
+    .terminal-body { font-size: 0.78rem; }
+    .asp-banner { font-size: 0.85em; }
 }
