@@ -482,69 +482,104 @@ def start_meditate_session(duration_minutes: int = 5, style: str = "body-scan") 
 # ---------------------------------------------------------------------------
 # Custom CSS for Off-Brand Badge
 # ---------------------------------------------------------------------------
-
 FOCUSFRIEND_CSS = """
-/* ===== FocusFriend — Custom Off-Brand Theme ===== */
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap');
+/* =========================================================================
+   FocusFriend — Anishinaabe Solarpunk Theme
+   ----------------------------------------------------------------------------
+   Pip lives on the lake. Cedar-copper, sun-amber, water-blue.
+   ========================================================================= */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600&family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap');
 
 :root {
-    --ff-bg: #1a1a2e;
-    --ff-surface: #16213e;
-    --ff-surface2: #0f3460;
-    --ff-text: #e0d7c6;
-    --ff-text-dim: #a89f91;
-    --ff-accent: #e8b44b;
-    --ff-accent2: #d4756b;
-    --ff-green: #7eb77f;
-    --ff-border: #2a2a4a;
-    --ff-pip-bg: #0d1117;
-    --ff-radius: 8px;
-    --ff-font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
-    --ff-font-sans: 'Inter', 'SF Pro', system-ui, sans-serif;
+    /* Anishinaabe-Solarpunk tokens */
+    --asp-sky:       #5BA4D9;
+    --asp-water:     #1B4965;
+    --asp-ice:       #BEE9E8;
+    --asp-frost:     #CAF0F8;
+    --asp-sun:       #F2A93B;
+    --asp-sunlight:  #FFB347;
+    --asp-ember:     #E76F51;
+    --asp-birch:     #F5F1E8;
+    --asp-terra:     #C8553D;
+    --asp-earth:     #8B3A1F;
+    --asp-moss:      #588157;
+    --asp-forest:    #3D6A4A;
+    --asp-spruce:    #1B4332;
+    --asp-night:     #0F1A2C;
+    --asp-ash:       #3A2E2A;
+    --asp-stone:     #A89F91;
+
+    /* Aliases to the FocusFriend legacy names so the rest of the CSS works */
+    --ff-bg:         var(--asp-night);
+    --ff-surface:    #142a3a;
+    --ff-surface2:   #1B4965;
+    --ff-text:       var(--asp-birch);
+    --ff-text-dim:   var(--asp-frost);
+    --ff-accent:     var(--asp-sun);
+    --ff-accent2:    var(--asp-ember);
+    --ff-green:      var(--asp-moss);
+    --ff-border:     rgba(91, 164, 217, 0.3);
+    --ff-pip-bg:     #0a1520;
+    --ff-radius:     10px;
+    --ff-font-mono:  'JetBrains Mono', 'SF Mono', monospace;
+    --ff-font-sans:  'Inter', 'SF Pro', system-ui, sans-serif;
+    --ff-font-serif: 'EB Garamond', 'Iowan Old Style', Georgia, serif;
 }
 
-/* Global overrides */
-.gradio-container {
-    background: var(--ff-bg) !important;
-    font-family: var(--ff-font-sans) !important;
+/* === Background = sky over lake over forest =========================== */
+body, .gradio-container {
+    background:
+        radial-gradient(ellipse at top, rgba(91, 164, 217, 0.18) 0%, transparent 60%),
+        radial-gradient(ellipse at bottom, rgba(27, 73, 50, 0.25) 0%, transparent 70%),
+        var(--asp-night) !important;
     color: var(--ff-text) !important;
-    max-width: 100% !important;
-}
-
-/* Headers */
-h1, h2, h3, h4 {
     font-family: var(--ff-font-sans) !important;
-    color: var(--ff-accent) !important;
+    max-width: 100% !important;
+    background-attachment: fixed;
 }
 
-/* Main layout — two column */
+/* === Headers / typography ============================================ */
+h1, h2, h3, h4 {
+    font-family: var(--ff-font-serif) !important;
+    color: var(--ff-accent) !important;
+    text-shadow: 0 0 20px rgba(242, 169, 59, 0.18);
+}
+h1 { letter-spacing: 0.5px; }
+
+/* === Layout ========================================================= */
 .ff-container {
     display: flex;
     gap: 24px;
     min-height: 80vh;
 }
 
+/* === Pip Panel — Aanishinaabe cedar shrine =========================== */
 .ff-pip-panel {
     flex: 0 0 380px;
-    background: var(--ff-pip-bg);
+    background:
+        linear-gradient(180deg, #0a1520 0%, #142a3a 100%);
     border: 2px solid var(--ff-border);
     border-radius: var(--ff-radius);
     padding: 20px;
     display: flex;
     flex-direction: column;
     align-items: center;
+    box-shadow:
+        inset 0 0 30px rgba(91, 164, 217, 0.08),
+        0 0 30px rgba(0, 0, 0, 0.4);
 }
 
 .ff-pip-art {
     font-family: var(--ff-font-mono);
-    font-size: 14px;
+    font-size: 13px;
     line-height: 1.3;
-    color: var(--ff-accent);
+    color: var(--asp-sun);
     white-space: pre;
     text-align: center;
     background: transparent;
     padding: 24px 16px;
     min-height: 240px;
+    text-shadow: 0 0 8px rgba(242, 169, 59, 0.25);
 }
 
 .ff-chat-panel {
@@ -554,13 +589,15 @@ h1, h2, h3, h4 {
     gap: 16px;
 }
 
+/* === Mode bar ======================================================= */
 .ff-mode-bar {
     display: flex;
     gap: 8px;
     padding: 12px;
-    background: var(--ff-surface);
+    background: linear-gradient(95deg, var(--ff-surface) 0%, rgba(20, 42, 58, 0.5) 100%);
     border-radius: var(--ff-radius);
     border: 1px solid var(--ff-border);
+    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.3);
 }
 
 .ff-mode-btn {
@@ -576,22 +613,25 @@ h1, h2, h3, h4 {
 }
 
 .ff-mode-btn:hover {
-    background: var(--ff-accent) !important;
+    background: linear-gradient(95deg, var(--asp-sun) 0%, var(--asp-sunlight) 100%) !important;
     color: var(--ff-bg) !important;
     border-color: var(--ff-accent) !important;
+    box-shadow: 0 0 16px rgba(242, 169, 59, 0.3);
 }
 
 .ff-mode-btn.active {
-    background: var(--ff-accent) !important;
+    background: linear-gradient(95deg, var(--asp-sun) 0%, var(--asp-sunlight) 100%) !important;
     color: var(--ff-bg) !important;
     border-color: var(--ff-accent) !important;
+    box-shadow: 0 0 20px rgba(242, 169, 59, 0.4);
 }
 
-/* Chat styling */
+/* === Chat ========================================================== */
 .ff-chatbot {
     border: 1px solid var(--ff-border) !important;
     border-radius: var(--ff-radius) !important;
     background: var(--ff-surface) !important;
+    box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.3);
 }
 
 .ff-chatbot .message {
@@ -600,49 +640,57 @@ h1, h2, h3, h4 {
 
 .ff-chatbot .user {
     background: var(--ff-surface2) !important;
+    border-left: 3px solid var(--asp-frost) !important;
 }
 
 .ff-chatbot .bot {
     background: var(--ff-pip-bg) !important;
     border-left: 3px solid var(--ff-accent) !important;
+    box-shadow: inset 0 0 20px rgba(242, 169, 59, 0.04);
 }
 
-/* Input area */
+/* === Input row ====================================================== */
 .ff-input-row {
     display: flex;
     gap: 12px;
 }
 
-/* Buttons */
+/* === Buttons ======================================================== */
 button.primary {
-    background: var(--ff-accent) !important;
-    color: var(--ff-bg) !important;
+    background: linear-gradient(95deg, var(--asp-sun) 0%, var(--asp-sunlight) 100%) !important;
+    color: var(--asp-night) !important;
     font-weight: 600 !important;
     border: none !important;
     border-radius: 6px !important;
     padding: 10px 20px !important;
     transition: all 0.2s !important;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 0.85em;
 }
 button.primary:hover {
-    background: var(--ff-accent2) !important;
+    background: linear-gradient(95deg, var(--asp-sunlight) 0%, var(--asp-birch) 100%) !important;
+    box-shadow: 0 0 20px rgba(242, 169, 59, 0.5);
+    transform: translateY(-1px);
 }
 
-/* Timer display */
+/* === Timer — solarpunk sun arc ====================================== */
 .ff-timer {
     font-family: var(--ff-font-mono);
     font-size: 3em;
     text-align: center;
-    color: var(--ff-accent);
+    color: var(--asp-sun);
     padding: 20px;
+    text-shadow: 0 0 24px rgba(242, 169, 59, 0.4);
 }
 
-/* Custom scrollbar */
+/* === Scrollbar ===================================================== */
 ::-webkit-scrollbar { width: 8px; }
-::-webkit-scrollbar-track { background: var(--ff-bg); }
+::-webkit-scrollbar-track { background: var(--asp-night); }
 ::-webkit-scrollbar-thumb { background: var(--ff-border); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: var(--ff-accent); }
+::-webkit-scrollbar-thumb:hover { background: var(--asp-sun); }
 
-/* Animations */
+/* === Animations ==================================================== */
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
@@ -650,12 +698,44 @@ button.primary:hover {
 .ff-breathing {
     animation: pulse 4s ease-in-out infinite;
 }
+@keyframes sunGlow {
+    0%, 100% { box-shadow: 0 0 30px rgba(242, 169, 59, 0.2); }
+    50% { box-shadow: 0 0 50px rgba(242, 169, 59, 0.4); }
+}
 
-/* Gradio overrides */
+/* === Gradio overrides ============================================== */
 footer { display: none !important; }
 .tabs { border: none !important; }
-.tab-nav button { background: var(--ff-surface) !important; color: var(--ff-text-dim) !important; }
-.tab-nav button.selected { background: var(--ff-accent) !important; color: var(--ff-bg) !important; }
+.tab-nav button {
+    background: var(--ff-surface) !important;
+    color: var(--ff-text-dim) !important;
+}
+.tab-nav button.selected {
+    background: linear-gradient(95deg, var(--asp-sun) 0%, var(--asp-sunlight) 100%) !important;
+    color: var(--asp-night) !important;
+    box-shadow: 0 0 16px rgba(242, 169, 59, 0.3);
+}
+
+/* === Anishinaabe-Solarpunk Banner ================================== */
+.asp-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6em;
+    padding: 12px 18px;
+    background: linear-gradient(95deg, var(--asp-sky) 0%, var(--asp-water) 100%);
+    color: var(--asp-birch);
+    border-bottom: 1px solid rgba(255, 179, 71, 0.3);
+    font-family: var(--ff-font-serif);
+    letter-spacing: 0.5px;
+    text-shadow: 0 1px 2px rgba(15, 26, 44, 0.45);
+    margin-bottom: 16px;
+    border-radius: var(--ff-radius);
+}
+.asp-banner .syll { font-size: 1.4em; opacity: 0.9; }
+.asp-banner .title { font-size: 1.05em; font-weight: 600; }
+.asp-banner .glyph { color: var(--asp-sunlight); }
+.asp-banner .subtitle { color: var(--asp-frost); font-size: 0.85em; font-style: italic; opacity: 0.9; }
 """
 
 # ---------------------------------------------------------------------------
@@ -728,25 +808,26 @@ function getBreatheDuration(technique) {
 def create_app() -> gr.Blocks:
     """Build the FocusFriend Gradio application with custom Off-Brand UI."""
     with gr.Blocks(
-        css=FOCUSFRIEND_CSS,
-        head=FOCUSFRIEND_JS,
         title="FocusFriend — Pip, Your ASCII Wellness Companion",
-        theme=gr.themes.Monochrome(),
     ) as app:
         # State
         session_mode = gr.State("chat")
         session_history = gr.State([])
 
         # Header
+        # Header — Anishinaabe-Solarpunk banner
         gr.HTML("""
-        <div style="text-align: center; padding: 20px 0 30px;">
-            <h1 style="font-size: 2.2em; margin: 0;">
-                ✦  FocusFriend
-            </h1>
-            <p style="color: #a89f91; font-size: 1.1em; margin-top: 8px;">
-                Pip is here. Your tiny, honest, ASCII wellness companion.
-            </p>
+        <div class="asp-banner">
+            <span class="syll">ᐴ</span>
+            <span class="glyph">☼</span>
+            <span class="title">FOCUSFRIEND</span>
+            <span class="glyph">☘</span>
+            <span class="subtitle">— Pip, your cedar-and-sun companion on the lake —</span>
+            <span class="syll">ᔔ</span>
         </div>
+        <h2 style="text-align:center; margin-top:-8px; margin-bottom:20px; font-style:italic; font-size:1em; color: var(--ff-text-dim);">
+            Aaniin, amiikwens — I am Pip, the friend of the moss and the small winds.
+        </h2>
         """)
 
         with gr.Row(equal_height=False):
@@ -902,18 +983,19 @@ def create_app() -> gr.Blocks:
                 outputs=[session_mode],
             )
 
-        # Chat handler with streaming
+        # Chat handler with streaming — Gradio 6.0 Chatbot wants dicts
         def chat_handler(message: str, history: List, mode: str):
             """Handle chat messages with streaming Pip responses."""
             if not message.strip():
                 yield history, pip_display.value
                 return
 
-            history = history or []
-            history.append((message, ""))
+            history = list(history or [])
+            history.append({"role": "user", "content": message})
+            history.append({"role": "assistant", "content": ""})
 
-            for response, mood in chat_with_pip(message, history[:-1], mode):
-                history[-1] = (message, response)
+            for response, mood in chat_with_pip(message, history[:-2], mode):
+                history[-1] = {"role": "assistant", "content": response}
                 pip_art = get_pip_expression(mood)
                 yield history, pip_art
 
@@ -960,7 +1042,7 @@ def create_app() -> gr.Blocks:
         app.load(
             fn=lambda: (
                 get_pip_expression("greeting"),
-                "Hey! I'm Pip. Your focus buddy, breathing coach, and part-time philosopher. [mood: greeting]\n\nWhat do you need right now?"
+                [{"role": "assistant", "content": "Hey! I\'m Pip. Your focus buddy, breathing coach, and part-time philosopher. [mood: greeting]\n\nWhat do you need right now?"}]
             ),
             outputs=[pip_display, chatbot],
         )
@@ -975,7 +1057,10 @@ if __name__ == "__main__":
     app = create_app()
     app.launch(
         server_name="0.0.0.0",
-        server_port=int(os.environ.get("PORT", 7861)),
+        server_port=int(os.environ.get("PORT", "7861")),
         share=False,
         show_error=True,
+        mcp_server=True,
+        css=FOCUSFRIEND_CSS,
+        head=FOCUSFRIEND_JS,
     )
