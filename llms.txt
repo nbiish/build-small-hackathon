@@ -1,46 +1,89 @@
-# Project Name PRD — Project Requirements Document
+# Build Small Hackathon — PRD
+# Project Requirements Document
 
-> Project Description — Project Purpose
+> Three Gradio apps targeting all tracks + maximum badges + sponsor prizes.
+> Hack window: June 5-15, 2026. Deadline: June 15.
 
 ## Overview
 
-- **Name:** Project Name
-- **Version:** 0.1.0
-- **Description:** Project Description
-- **Purpose:** Project Purpose
-- **UX:** CLI, GUI, both, or else?
+- **Name:** Build Small Hackathon 2026 — Team nbiish
+- **Version:** 0.2.0
+- **Description:** Multi-project hackathon entry targeting $48K+ prize pool across Backyard AI and Thousand Token Wood tracks. Three Gradio apps using small models (≤32B) with maximum bonus badge coverage.
+- **Purpose:** Win prizes across tracks, badges, and sponsor categories by building delightful, useful AI apps that run locally.
+- **UX:** Gradio web apps (gr.Blocks + gr.Server custom frontends), hosted on HF Spaces.
 
 ## Rules
 
 ### Naming & Comments
-
-- Use descriptive names
-- Document code with comments
+- Descriptive names: CritterCalm, FocusFriend, TinyBard
+- Docstrings on all public functions. Comments on non-obvious logic.
 
 ### Always
-
-- 
+- Models ≤ 32B total params per project
+- Gradio app hosted as HF Space under build-small-hackathon org
+- Local-first (no cloud APIs = Off the Grid badge)
+- GGUF quantized models for local inference
+- Python 3.10+ with pinned requirements
 
 ### Never
-
-- 
+- Cloud API calls in production path
+- Hardcoded secrets or API keys
+- Models > 32B params
+- Default Gradio look without customization attempt
 
 ### If
+- If gr.Server is feasible → use it for Off-Brand badge
+- If model ≤ 4B → tag Tiny Titan eligible
+- If using llama.cpp runtime → tag Llama Champion
+- If fine-tuning is done → publish model to HF Hub
 
-- 
+## Projects
+
+### 1. CritterCalm (Backyard AI)
+- **Status:** Code complete. Needs: testing, HF deploy, demo video.
+- **Stack:** OmniVoice (0.6B) + Dolphin-X1-8B (8B) + Kokoro TTS (82M) = 8.7B
+- **Badges:** Off the Grid, Well-Tuned (TBD), Field Notes, Llama Champion (TBD)
+
+### 2. FocusFriend (Thousand Token Wood)
+- **Status:** Code complete. Needs: gr.Server upgrade, testing, HF deploy, demo video.
+- **Stack:** Gemma 4 12B (12B) via llama-cpp-python
+- **Badges:** Off-Brand (upgrade to gr.Server), Off the Grid, Field Notes
+
+### 3. TinyBard (Thousand Token Wood + Tiny Titan + Llama Champion)
+- **Status:** NOT STARTED. New project idea.
+- **Concept:** ≤4B LLM generates 5-min interactive text adventures. Terminal/pixel-art aesthetic.
+- **Stack:** Qwen 2.5 1.5B or Phi-4-mini (3.8B) via llama.cpp
+- **Badges:** Llama Champion, Tiny Titan, Off-Brand (gr.Server), Off the Grid, Field Notes
+- **Prize targets:** Tiny Titan ($1K), Thousand Token Wood track, Bonus Quest Champion potential
 
 ## TODO
 
 > Keep tasks atomic and testable.
 
 ### In Progress
-
-- [ ] 
+- [ ] Upgrade FocusFriend to gr.Server custom frontend
+- [ ] Test both apps locally with real models
 
 ### Completed
-
-- [ ] 
+- [x] CritterCalm v1 code complete (11 files)
+- [x] FocusFriend v1 code complete (16 files)
+- [x] GitHub repos created (nbiish/crittercalm, nbiish/focusfriend)
+- [x] Monorepo structure with projects/ directory
+- [x] INTELLIGENCE.md — full hackathon landscape analysis
+- [x] SUBMISSION_DRAFTS.md — social posts + Field Notes drafts
 
 ## Short-term Goals
+- Deploy both projects to HF Spaces under build-small-hackathon org
+- Download + verify all GGUF models locally
+- Test CritterCalm voice cloning pipeline end-to-end
+- Test FocusFriend all 4 modes
+- Record demo videos (2-3 min each)
+- Post to social media
+- Build TinyBard if time permits
+- Share agent traces to HF Hub (Sharing is Caring badge)
 
 ## Reference Codebases
+- CritterCalm: projects/crittercalm/ + github.com/nbiish/crittercalm
+- FocusFriend: projects/focusfriend/ + github.com/nbiish/focusfriend
+- ML Intern: github.com/huggingface/ml-intern
+- gr.Server examples: huggingface.co/blog/introducing-gradio-server
