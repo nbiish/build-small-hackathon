@@ -3,63 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TinyBard — Micro Text Adventure</title>
+    <title>ᐴ TinyBard ᔔ — Aanishinaabe Mikinaak-Aki</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+    <header class="asp-banner">
+        <span class="syll">ᐴ</span>
+        <span class="glyph">☼</span>
+        <span class="title">TINYBARD</span>
+        <span class="glyph">☘</span>
+        <span class="subtitle">— a fire-fly storyteller in cedar and copper —</span>
+        <span class="syll">ᔔ</span>
+    </header>
     <div class="crt-container">
         <div class="crt-screen" id="screen">
             <div class="scanlines"></div>
             <div class="vignette"></div>
-            
+
             <div class="terminal" id="terminal">
                 <div class="terminal-header">
-                    <span class="prompt">TINYBARD v1.0</span>
-                    <span class="status" id="health-bar">HEALTH: <span id="health-val">100</span></span>
+                    <span class="prompt">ᐴ TINYBARD v1.0 ᔔ  ·  GIIZHI-AADIZOKED</span>
+                    <span class="status" id="health-bar">NOOSISKAAZOWIN: <span id="health-val">100</span></span>
                 </div>
-                
+
                 <div class="terminal-body" id="output">
                     <div class="boot-sequence" id="boot">
-                        <span class="line">> INITIALIZING NEURAL INTERFACE...</span>
-                        <span class="line">> LOADING NARRATIVE ENGINE...</span>
-                        <span class="line">> CONNECTING TO GRADIO SERVER...</span>
-                        <span class="line success">> CONNECTION ESTABLISHED</span>
-                        <span class="line">> SELECT GENRE TO BEGIN</span>
+                        <span class="line">☼ &gt; INITIAINDIZOWIN / INITIALIZING NEURAL INTERFACE...</span>
+                        <span class="line">☼ &gt; AABAJICHIGANAN / LOADING NARRATIVE ENGINE...</span>
+                        <span class="line">☼ &gt; GIIWENAABIK / CONNECTING TO GRADIO SERVER...</span>
+                        <span class="line success">☼ &gt; MII-GIIWETA / CONNECTION ESTABLISHED</span>
+                        <span class="line">ᐴ &gt; INAABANDA'IWIN / SELECT GENRE TO BEGIN ᔔ</span>
                     </div>
                 </div>
-                
+
                 <div class="genre-selector" id="genre-selector">
                     <div class="genre-option" data-genre="fantasy">
-                        <span class="icon">⚔</span> FANTASY
+                        <span class="icon">☼</span> AADIZOOKAAN / FANTASY
                     </div>
                     <div class="genre-option" data-genre="scifi">
-                        <span class="icon">🚀</span> SCI-FI
+                        <span class="icon">◈</span> ISHPIMING / SCI-FI
                     </div>
                     <div class="genre-option" data-genre="cyberpunk">
-                        <span class="icon">🌆</span> CYBERPUNK
+                        <span class="icon">◆</span> MASHKODEWAAZIBI / CYBERPUNK
                     </div>
                 </div>
-                
+
                 <div class="choices-container" id="choices" style="display: none;">
                     <!-- Choices injected here -->
                 </div>
-                
+
                 <div class="input-line" id="input-line" style="display: none;">
-                    <span class="prompt-char">></span>
+                    <span class="prompt-char">ᐴ&gt;</span>
                     <input type="text" id="cmd-input" autocomplete="off" spellcheck="false" />
-                    <span class="cursor" id="cursor">_</span>
+                    <span class="cursor">_</span>
                 </div>
-                
+
                 <div class="terminal-footer">
-                    <span>TinyBard | gr.Server + MCP | Llama.cpp</span>
-                    <span id="model-status">MODEL: LOADING...</span>
+                    <span>ᐴ TinyBard · FastAPI + Gradio + MCP · llama.cpp ᔔ</span>
+                    <span id="model-status">☘ MODEL: AABAJICHIGE / LOADING...</span>
                 </div>
             </div>
         </div>
-        
+
         <div class="crt-reflection"></div>
     </div>
-    
+
     <script type="module" src="/static/main.js"></script>
 </body>
 </html>
