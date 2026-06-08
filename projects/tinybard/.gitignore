@@ -1,0 +1,10 @@
+# AINISH Coder Tooling Distribution - Git Ignore Patterns
+__pycache__/
+*.pyc
+venv/
+.venv/
+.DS_Store
+*.log
+tmp/
+models/
+*.gguf
