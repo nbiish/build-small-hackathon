@@ -1,0 +1,12 @@
+# FocusFriend — ASCII Wellness Companion
+# Python 3.10+
+
+# === Core ===
+gradio>=5.0
+numpy>=1.24
+
+# === LLM Inference (Gemma 4 12B) ===
+llama-cpp-python>=0.3.0
+
+# === Utilities ===
+huggingface_hub>=0.20

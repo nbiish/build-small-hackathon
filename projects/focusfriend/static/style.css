@@ -1,0 +1,357 @@
+/* ============================================================
+   FocusFriend — Custom Off-Brand Stylesheet
+   Dark, cozy theme with amber/gold accents.
+   Designed to feel like a warm room at night, not a corporate app.
+   ============================================================ */
+
+/* === CSS Variables === */
+:root {
+    --ff-bg: #1a1a2e;
+    --ff-surface: #16213e;
+    --ff-surface2: #0f3460;
+    --ff-text: #e0d7c6;
+    --ff-text-dim: #a89f91;
+    --ff-accent: #e8b44b;
+    --ff-accent-glow: rgba(232, 180, 75, 0.3);
+    --ff-accent2: #d4756b;
+    --ff-green: #7eb77f;
+    --ff-border: #2a2a4a;
+    --ff-pip-bg: #0d1117;
+    --ff-radius: 8px;
+    --ff-font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Courier New', monospace;
+    --ff-font-sans: 'Inter', 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+}
+
+/* === Global === */
+.gradio-container {
+    background: var(--ff-bg) !important;
+    font-family: var(--ff-font-sans) !important;
+    color: var(--ff-text) !important;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--ff-font-sans) !important;
+    color: var(--ff-accent) !important;
+    font-weight: 600 !important;
+}
+
+a {
+    color: var(--ff-accent) !important;
+}
+
+/* === Header === */
+.ff-header {
+    text-align: center;
+    padding: 24px 0 32px;
+}
+
+.ff-header h1 {
+    font-size: 2.4em;
+    margin: 0;
+    background: linear-gradient(135deg, var(--ff-accent), var(--ff-accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* === Pip Display Panel === */
+.ff-pip-panel {
+    background: var(--ff-pip-bg);
+    border: 2px solid var(--ff-border);
+    border-radius: 12px;
+    padding: 24px 20px;
+    min-height: 320px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 40px var(--ff-accent-glow) inset;
+}
+
+.ff-pip-art {
+    font-family: var(--ff-font-mono) !important;
+    font-size: 13px !important;
+    line-height: 1.35 !important;
+    color: var(--ff-accent) !important;
+    white-space: pre !important;
+    text-align: center !important;
+    background: transparent !important;
+    border: none !important;
+    padding: 16px !important;
+    min-height: 240px !important;
+    text-shadow: 0 0 20px var(--ff-accent-glow);
+}
+
+.ff-pip-art textarea {
+    font-family: var(--ff-font-mono) !important;
+    color: var(--ff-accent) !important;
+    background: transparent !important;
+    border: none !important;
+    resize: none !important;
+    text-align: center !important;
+}
+
+/* === Timer === */
+.ff-timer {
+    font-family: var(--ff-font-mono);
+    font-size: 3.5em;
+    text-align: center;
+    color: var(--ff-accent);
+    padding: 16px;
+    letter-spacing: 4px;
+    text-shadow: 0 0 30px var(--ff-accent-glow);
+}
+
+.ff-timer.warning {
+    color: var(--ff-accent2);
+    animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* === Mode Bar === */
+.ff-mode-bar {
+    display: flex;
+    gap: 8px;
+    padding: 12px;
+    background: var(--ff-surface);
+    border-radius: 12px;
+    border: 1px solid var(--ff-border);
+    margin-bottom: 16px;
+}
+
+.ff-mode-bar button {
+    font-family: var(--ff-font-sans) !important;
+    font-weight: 500 !important;
+    font-size: 0.95em !important;
+    padding: 10px 20px !important;
+    border-radius: 8px !important;
+    border: 1px solid var(--ff-border) !important;
+    background: var(--ff-surface2) !important;
+    color: var(--ff-text-dim) !important;
+    cursor: pointer !important;
+    transition: all 0.25s ease !important;
+    flex: 1 !important;
+}
+
+.ff-mode-bar button:hover {
+    background: rgba(232, 180, 75, 0.15) !important;
+    color: var(--ff-accent) !important;
+    border-color: var(--ff-accent) !important;
+    transform: translateY(-1px);
+}
+
+.ff-mode-bar button.active,
+.ff-mode-bar button.selected {
+    background: var(--ff-accent) !important;
+    color: var(--ff-bg) !important;
+    border-color: var(--ff-accent) !important;
+    font-weight: 600 !important;
+    box-shadow: 0 0 20px var(--ff-accent-glow);
+}
+
+/* === Chatbot === */
+.ff-chatbot {
+    border: 1px solid var(--ff-border) !important;
+    border-radius: 12px !important;
+    background: var(--ff-surface) !important;
+    overflow: hidden !important;
+}
+
+.ff-chatbot .message-wrap {
+    padding: 12px 16px !important;
+}
+
+.ff-chatbot .user {
+    background: var(--ff-surface2) !important;
+    border-radius: 8px !important;
+    margin: 4px 0 !important;
+}
+
+.ff-chatbot .bot {
+    background: var(--ff-pip-bg) !important;
+    border-left: 3px solid var(--ff-accent) !important;
+    border-radius: 0 8px 8px 0 !important;
+    margin: 4px 0 !important;
+}
+
+.ff-chatbot .bot p {
+    color: var(--ff-text) !important;
+}
+
+/* === Chat Input === */
+.ff-chat-input textarea {
+    background: var(--ff-surface) !important;
+    border: 1px solid var(--ff-border) !important;
+    border-radius: 8px !important;
+    color: var(--ff-text) !important;
+    font-family: var(--ff-font-sans) !important;
+    padding: 12px !important;
+    resize: none !important;
+}
+
+.ff-chat-input textarea:focus {
+    border-color: var(--ff-accent) !important;
+    box-shadow: 0 0 15px var(--ff-accent-glow) !important;
+}
+
+/* === Primary Buttons === */
+button.primary,
+button[variant="primary"] {
+    background: var(--ff-accent) !important;
+    color: var(--ff-bg) !important;
+    font-weight: 600 !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 10px 24px !important;
+    transition: all 0.25s ease !important;
+    font-size: 1em !important;
+}
+
+button.primary:hover,
+button[variant="primary"]:hover {
+    background: #f0c55a !important;
+    box-shadow: 0 4px 20px var(--ff-accent-glow) !important;
+    transform: translateY(-1px);
+}
+
+button.primary:active,
+button[variant="primary"]:active {
+    transform: translateY(0);
+}
+
+/* === Secondary Buttons === */
+button.secondary {
+    background: var(--ff-surface2) !important;
+    color: var(--ff-text) !important;
+    border: 1px solid var(--ff-border) !important;
+    border-radius: 8px !important;
+    padding: 10px 24px !important;
+    transition: all 0.25s ease !important;
+}
+
+button.secondary:hover {
+    border-color: var(--ff-accent) !important;
+    color: var(--ff-accent) !important;
+}
+
+/* === Dropdowns & Sliders === */
+select, .dropdown {
+    background: var(--ff-surface) !important;
+    border: 1px solid var(--ff-border) !important;
+    border-radius: 8px !important;
+    color: var(--ff-text) !important;
+    padding: 8px 12px !important;
+}
+
+input[type="range"] {
+    accent-color: var(--ff-accent);
+}
+
+/* === Group Panels === */
+.gr-group {
+    background: var(--ff-surface) !important;
+    border: 1px solid var(--ff-border) !important;
+    border-radius: 12px !important;
+    padding: 16px !important;
+    margin-bottom: 12px !important;
+}
+
+/* === Accordion === */
+.gr-accordion {
+    background: var(--ff-surface) !important;
+    border: 1px solid var(--ff-border) !important;
+    border-radius: 12px !important;
+}
+
+/* === Scrollbar === */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--ff-bg);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--ff-border);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--ff-accent);
+}
+
+/* === Footer (hide Gradio default) === */
+footer {
+    display: none !important;
+}
+
+/* === Tabs (hidden for our custom UI) === */
+.tabs {
+    border: none !important;
+}
+
+.tab-nav {
+    display: none !important;
+}
+
+/* === Responsive === */
+@media (max-width: 768px) {
+    .ff-pip-panel {
+        min-height: 200px;
+        padding: 12px;
+    }
+
+    .ff-pip-art {
+        font-size: 10px !important;
+        min-height: 160px !important;
+    }
+
+    .ff-mode-bar {
+        flex-wrap: wrap;
+    }
+
+    .ff-mode-bar button {
+        font-size: 0.85em !important;
+        padding: 8px 12px !important;
+    }
+
+    .ff-timer {
+        font-size: 2.5em;
+    }
+}
+
+/* === Breathing animation === */
+.ff-breathing-in {
+    animation: breatheIn 4s ease-in-out;
+}
+
+.ff-breathing-out {
+    animation: breatheOut 8s ease-in-out;
+}
+
+@keyframes breatheIn {
+    from { transform: scale(1); }
+    to { transform: scale(1.05); }
+}
+
+@keyframes breatheOut {
+    from { transform: scale(1.05); }
+    to { transform: scale(1); }
+}
+
+/* === Focus complete celebration === */
+.ff-celebrate {
+    animation: celebrate 0.5s ease-in-out 3;
+}
+
+@keyframes celebrate {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
