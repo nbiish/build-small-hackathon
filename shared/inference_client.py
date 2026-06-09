@@ -105,8 +105,7 @@ def _get_client():
     from huggingface_hub import InferenceClient
     return InferenceClient(
         model=INFERENCE_MODEL,
-        token=HF_TOKEN,  # provider kwarg removed for hf-inference default
-        
+        token=HF_TOKEN,
     )
 def generate(
     project: str,
