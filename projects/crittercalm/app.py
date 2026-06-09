@@ -24,13 +24,12 @@ from typing import Optional, Generator
 
 import gradio as gr
 import numpy as np
-import soundfile as sf
-
-# Project modules
-from content.templates import get_template
-from content.script_generator import generate_calming_script
-from voice_cloning.openvoice_cloner import clone_voice
-from utils.audio_utils import load_audio, save_audio, validate_voice_sample
+try:
+    import soundfile as sf
+    SOUNDFILE_AVAILABLE = True
+except ImportError:
+    sf = None
+    SOUNDFILE_AVAILABLE = False
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -40,6 +39,33 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 log = logging.getLogger("crittercalm")
+
+if not SOUNDFILE_AVAILABLE:
+    log.warning("soundfile not available — voice cloning disabled, Kokoro fallback will be used.")
+
+# Project modules
+try:
+    from content.templates import get_template
+    from content.script_generator import generate_calming_script
+except Exception as e:
+    log.error(f"Failed to import content modules: {e}")
+    raise
+
+try:
+    from voice_cloning.openvoice_cloner import clone_voice
+    VOICE_CLONING_AVAILABLE = True
+except Exception as e:
+    log.warning(f"voice_cloning not available: {e}")
+    clone_voice = None
+    VOICE_CLONING_AVAILABLE = False
+
+try:
+    from utils.audio_utils import load_audio, save_audio, validate_voice_sample
+    AUDIO_UTILS_AVAILABLE = True
+except Exception as e:
+    log.warning(f"utils.audio_utils not available: {e}")
+    load_audio = save_audio = validate_voice_sample = None
+    AUDIO_UTILS_AVAILABLE = False
 
 # ---------------------------------------------------------------------------
 # Paths — models stored locally or via env vars
