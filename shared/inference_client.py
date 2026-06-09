@@ -103,10 +103,12 @@ class InferenceResult:
 def _get_client():
     """Lazy-load the InferenceClient to keep boot fast."""
     from huggingface_hub import InferenceClient
+    # By passing the model-specific serverless endpoint as base_url and omitting the model param,
+    # we force huggingface_hub to use the free serverless API instead of the paid router.huggingface.co.
+    model_endpoint = f"https://api-inference.huggingface.co/models/{INFERENCE_MODEL}"
     return InferenceClient(
-        model=INFERENCE_MODEL,
+        base_url=model_endpoint,
         token=HF_TOKEN,
-        base_url="https://api-inference.huggingface.co",
     )
 def generate(
     project: str,
