@@ -627,9 +627,9 @@ app = mount_gradio_app(fastapi_app, demo, path="/gradio")
 # Entrypoint
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    # On HF Spaces, Gradio manages the server — don't start uvicorn.
     if os.environ.get("SPACE_ID"):
-        log.info("Running on HF Spaces — Gradio launcher handles serving.")
+        log.info("Running on HF Spaces — launching Gradio server.")
+        demo.launch(server_name="0.0.0.0", server_port=int(os.environ.get("PORT", "7860")))
     else:
         import uvicorn
         port = int(os.environ.get("PORT", "7860"))
