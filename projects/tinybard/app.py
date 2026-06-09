@@ -620,17 +620,21 @@ async def get_config():
 fastapi_app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # Mount Gradio app at /gradio — this creates the API + MCP endpoints
-gradio_blocks = create_gradio_app()
-mount_gradio_app(fastapi_app, gradio_blocks, path="/gradio")
+demo = create_gradio_app()
+app = mount_gradio_app(fastapi_app, demo, path="/gradio")
 
 # ---------------------------------------------------------------------------
 # Entrypoint
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    import uvicorn
-    port = int(os.environ.get("PORT", "7860"))
-    log.info(f"Starting TinyBard on port {port}")
-    log.info(f"Frontend: http://localhost:{port}/")
-    log.info(f"Gradio API: http://localhost:{port}/gradio/")
-    log.info(f"MCP schema: http://localhost:{port}/gradio/gradio_api/mcp/schema")
-    uvicorn.run(fastapi_app, host="0.0.0.0", port=port)
+    # On HF Spaces, Gradio manages the server — don't start uvicorn.
+    if os.environ.get("SPACE_ID"):
+        log.info("Running on HF Spaces — Gradio launcher handles serving.")
+    else:
+        import uvicorn
+        port = int(os.environ.get("PORT", "7860"))
+        log.info(f"Starting TinyBard on port {port}")
+        log.info(f"Frontend: http://localhost:{port}/")
+        log.info(f"Gradio API: http://localhost:{port}/gradio/")
+        log.info(f"MCP schema: http://localhost:{port}/gradio/gradio_api/mcp/schema")
+        uvicorn.run(fastapi_app, host="0.0.0.0", port=port)
