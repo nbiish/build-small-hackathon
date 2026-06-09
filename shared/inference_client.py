@@ -111,6 +111,7 @@ def generate(
     temperature: float = 0.7,
     token: Optional[str] = None,
     model: Optional[str] = None,
+    custom_endpoint: Optional[str] = None,
 ) -> InferenceResult:
     """Run a chat-style inference call, with cooldown enforcement.
 
@@ -146,7 +147,7 @@ def generate(
     use_token = token or HF_TOKEN
 
     # Call direct HF serverless Inference API
-    url = f"https://huggingface.co/api/models/{use_model}"
+    url = f"https://api.huggingface.co/models/{use_model}"
     headers = {}
     if use_token:
         headers["Authorization"] = f"Bearer {use_token}"
@@ -160,7 +161,8 @@ def generate(
         }
     }
     
-    resp = httpx.post(url, json=payload, headers=headers, timeout=30.0)
+    with httpx.Client(trust_env=True) as http_client:
+        resp = http_client.post(url, json=payload, headers=headers, timeout=30.0)
     if resp.status_code != 200:
         raise RuntimeError(f"HF Inference API Error {resp.status_code}: {resp.text}")
         

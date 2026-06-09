@@ -66,6 +66,7 @@ _USER_CONFIG_LOCK = threading.Lock()
 _USER_CONFIG: Dict[str, Optional[str]] = {
     "hf_token": None,
     "model": None,
+    "custom_endpoint": None,
 }
 
 
@@ -77,6 +78,11 @@ def get_user_hf_token() -> Optional[str]:
 def get_user_model() -> Optional[str]:
     with _USER_CONFIG_LOCK:
         return _USER_CONFIG["model"]
+
+
+def get_user_custom_endpoint() -> Optional[str]:
+    with _USER_CONFIG_LOCK:
+        return _USER_CONFIG["custom_endpoint"]
 
 
 # ---------------------------------------------------------------------------
@@ -171,7 +177,7 @@ GENRES = {
 
 def generate_procedural_step(genre: str, step: int, health: int, choice: str = "") -> dict:
     """Generate a fallback adventure step without LLM."""
-    genre_data = GENRES.get(genre.lower(), GENRES["fantasy"])
+    genre_data = GENRES.get((genre or "fantasy").lower(), GENRES["fantasy"])
 
     if step == 0:
         return {
@@ -234,82 +240,116 @@ def _parse_messages(genre: str, history: List[Dict[str, str]], next_instruction:
     return msgs
 
 
-def generate_llm_turn(
-    genre: str,
-    history: List[Dict[str, str]],
-    current_health: int,
-    next_instruction: str,
-) -> dict:
-    """Generate one full adventure turn via the LLM.
-
-    Returns a dict with keys: story, choices, health_delta, game_over.
-    health_delta is typically -15, 0, or +10 (the model decides).
-    """
+def generate_llm_story_beat(genre: str, history: List[Dict[str, str]], instruction: str) -> str:
+    """Generation 1: Generate the story beat for this turn."""
     if cooldown_active("tinybard"):
-        log.info("tinybard turn skipped (cooldown active)")
-        return {}
+        return ""
     system = (
         "You are the narrator of an interactive text adventure game. "
         f"Genre: {genre}. Write in the second person ('You...'). "
         "Keep descriptions highly atmospheric but short (under 3 sentences). "
-        "Focus on action, mystery, and choice. "
-        "After the story beat, output exactly 3 short distinct player choices on one line, "
-        "in the format: 1. <choice> | 2. <choice> | 3. <choice>"
-    )
-    user = (
-        f"Current health: {current_health}/100. "
-        f"History so far: {json.dumps(history[-4:])}. "
-        f"{next_instruction} "
-        "Also state a health delta of -15, 0, or +10 that reflects how risky this turn was."
+        "Focus on action, mystery, and choice. Do not offer choices here."
     )
     try:
         result = inference_generate(
             project="tinybard",
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-            max_new_tokens=220,
+            messages=_parse_messages(genre, history, instruction),
+            max_new_tokens=180,
             temperature=0.7,
+            token=get_user_hf_token(),
+            model=get_user_model(),
+            custom_endpoint=get_user_custom_endpoint(),
+        )
+        return result.text.strip()
+    except Exception as e:
+        log.warning(f"HF Inference error (story): {e}")
+        return ""
+
+
+def generate_llm_choices_for_story(genre: str, story: str) -> List[str]:
+    """Generation 2: Generate 3 distinct choices based on the story beat."""
+    if cooldown_active("tinybard"):
+        return []
+    system = (
+        "You generate 3 short, distinct player choices for an interactive text adventure. "
+        "Output exactly in the format: 1. <choice> | 2. <choice> | 3. <choice>"
+    )
+    user = f"Genre: {genre}. Story beat: {story[:400]}. Give 3 choices."
+    try:
+        result = inference_generate(
+            project="tinybard",
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+            max_new_tokens=80,
+            temperature=0.8,
+            token=get_user_hf_token(),
+            model=get_user_model(),
+            custom_endpoint=get_user_custom_endpoint(),
+        )
+        return _parse_choices(result.text)
+    except Exception as e:
+        log.warning(f"HF Inference error (choices): {e}")
+        return []
+
+
+def generate_llm_health_effect(genre: str, history: List[Dict[str, str]], current_health: int, story: str) -> dict:
+    """Generation 3: Model decides health delta and provides funny commentary.
+
+    Returns dict with keys: health_delta, commentary, game_over, overheal.
+    overheal = True when health goes >= 100.
+    game_over = True when health <= 0.
+    """
+    if cooldown_active("tinybard"):
+        return {"health_delta": random.choice([-15, 0, 10]), "commentary": "", "game_over": False, "overheal": False}
+    system = (
+        f"You are the narrator of a {genre} text adventure. "
+        "Based on the story beat, decide a health delta of -15, 0, or +10. "
+        "Then write ONE short funny sentence (under 20 words) about the health change. "
+        "Output format: HEALTH_DELTA: <number> | COMMENTARY: <funny sentence>"
+    )
+    user = f"Current health: {current_health}/100. Story: {story[:300]}. History: {json.dumps(history[-2:])}."
+    try:
+        result = inference_generate(
+            project="tinybard",
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+            max_new_tokens=60,
+            temperature=0.8,
+            token=get_user_hf_token(),
+            model=get_user_model(),
+            custom_endpoint=get_user_custom_endpoint(),
         )
         text = result.text.strip()
     except Exception as e:
-        log.warning(f"HF Inference error (fallback to procedural): {e}")
-        return {}
+        log.warning(f"HF Inference error (health): {e}")
+        return {"health_delta": random.choice([-15, 0, 10]), "commentary": "", "game_over": False, "overheal": False}
 
-    # Split story and choices
-    story = text
-    choices = []
-    health_delta = 0
-    for sep in ["\n1.", "\n1. ", " 1.", " Choices:"]:
-        if sep in text:
-            parts = text.split(sep, 1)
-            story = parts[0].strip()
-            rest = parts[1].strip()
-            choices = _parse_choices("1. " + rest)
-            break
-
-    if not choices:
-        choices = _parse_choices(text)
-
-    # Extract a simple health delta from the text when possible
-    m = re.search(r"health delta\s*[:=]\s*([+-]?\d+)", text, re.IGNORECASE)
+    # Parse health delta
+    health_delta = random.choice([-15, 0, 10])
+    m = re.search(r"HEALTH_DELTA:\s*([+-]?\d+)", text, re.IGNORECASE)
     if m:
         try:
             health_delta = int(m.group(1))
         except Exception:
-            health_delta = 0
-    else:
-        health_delta = random.choice([-15, 0, 10])
+            pass
 
-    new_health = max(0, min(100, current_health + health_delta))
+    # Parse commentary
+    commentary = ""
+    m2 = re.search(r"COMMENTARY:\s*(.+?)(?:\||$)", text, re.IGNORECASE | re.DOTALL)
+    if m2:
+        commentary = m2.group(1).strip()
+    else:
+        # Fallback: use the whole text minus the delta line
+        lines = text.split("\n")
+        commentary = " ".join(lines[1:]).strip() if len(lines) > 1 else ""
+
+    new_health = max(0, min(150, current_health + health_delta))
     game_over = new_health <= 0
+    overheal = new_health >= 100 and current_health < 100
     return {
-        "story": story,
-        "choices": choices[:3] if len(choices) >= 2 else [],
         "health_delta": health_delta,
-        "new_health": new_health,
+        "commentary": commentary,
         "game_over": game_over,
+        "overheal": overheal,
+        "new_health": new_health,
     }
 
 
@@ -335,26 +375,32 @@ def create_gradio_app() -> gr.Blocks:
         game_over_output = gr.Checkbox(label="Game Over")
         history_output = gr.Textbox(label="History JSON")
 
-        def api_start_game(genre: str):
+        def api_start_game(genre: str = "fantasy"):
             """Start a new interactive text adventure. Exposed as MCP tool."""
+            if not genre:
+                genre = "fantasy"
             genre = genre.lower()
             if genre not in ["fantasy", "scifi", "cyberpunk"]:
                 genre = "fantasy"
 
             # Try LLM first (will skip if cooldown is active)
             instruction = "Narrate the beginning of the adventure. What happens first? Do not offer choices yet."
-            turn = generate_llm_turn(genre, [], 100, instruction)
-            if not turn:
+            story = generate_llm_story_beat(genre, [], instruction)
+            if not story:
                 result = generate_procedural_step(genre, 0, 100)
                 return (
                     result["story"], result["choices"], result["health"],
                     result["step"], result["game_over"],
                     json.dumps(result.get("history", []))
                 )
-
-            history = [{"role": "narrator", "text": turn["story"]}]
-            choices = turn["choices"] if len(turn.get("choices", [])) >= 2 else ["Explore the area", "Check your equipment", "Proceed carefully"]
-            return (turn["story"], choices[:3], 100, 1, False, json.dumps(history))
+            choices = generate_llm_choices_for_story(genre, story)
+            if len(choices) < 2:
+                choices = ["Explore the area", "Check your equipment", "Proceed carefully"]
+            history = [{"role": "narrator", "text": story}]
+            health_effect = generate_llm_health_effect(genre, history, 100, story)
+            if health_effect.get("commentary"):
+                story = f"{story}\n\n{health_effect['commentary']}"
+            return (story, choices[:3], health_effect["new_health"], 1, health_effect["game_over"], json.dumps(history))
 
         def api_make_choice(choice: str, genre: str, step: int, health: int, history_json: str):
             """Submit a player choice to advance the story. Exposed as MCP tool."""
@@ -369,19 +415,22 @@ def create_gradio_app() -> gr.Blocks:
             history.append({"role": "player", "text": choice})
 
             instruction = "Narrate what happens next as a result of the player's choice."
-            turn = generate_llm_turn(genre, history, health, instruction)
-            if not turn:
+            story = generate_llm_story_beat(genre, history, instruction)
+            if not story:
                 result = generate_procedural_step(genre, step, health, choice)
                 return (
                     result["story"], result["choices"], result["health"],
                     result["step"], result["game_over"],
                     json.dumps(result.get("history", history))
                 )
-
-            history.append({"role": "narrator", "text": turn["story"]})
-            choices = turn["choices"] if len(turn.get("choices", [])) >= 2 else ["Move forward", "Look around", "Rest a moment"]
-
-            return (turn["story"], choices[:3], turn["new_health"], step + 1, turn["game_over"], json.dumps(history))
+            choices = generate_llm_choices_for_story(genre, story)
+            if len(choices) < 2:
+                choices = ["Move forward", "Look around", "Rest a moment"]
+            history.append({"role": "narrator", "text": story})
+            health_effect = generate_llm_health_effect(genre, history, health, story)
+            if health_effect.get("commentary"):
+                story = f"{story}\n\n{health_effect['commentary']}"
+            return (story, choices[:3], health_effect["new_health"], step + 1, health_effect["game_over"], json.dumps(history))
 
         # Register API endpoints
         gr.Button("Start Game").click(
@@ -449,14 +498,20 @@ def _run_turn(choice: str, genre: str, step: int, health: int, history: List[Dic
         if in_cooldown:
             return generate_procedural_step(genre, 0, 100)
         instruction = "Narrate the beginning of the adventure. What happens first? Do not offer choices yet."
-        turn = generate_llm_turn(genre, [], 100, instruction)
-        if not turn:
+        story = generate_llm_story_beat(genre, [], instruction)
+        if not story:
             return generate_procedural_step(genre, 0, 100)
-        history = [{"role": "narrator", "text": turn["story"]}]
-        choices = turn["choices"] if len(turn.get("choices", [])) >= 2 else ["Explore the area", "Check your equipment", "Proceed carefully"]
+        choices = generate_llm_choices_for_story(genre, story)
+        if len(choices) < 2:
+            choices = ["Explore the area", "Check your equipment", "Proceed carefully"]
+        history = [{"role": "narrator", "text": story}]
+        health_effect = generate_llm_health_effect(genre, history, 100, story)
+        if health_effect.get("commentary"):
+            story = f"{story}\n\n{health_effect['commentary']}"
         return {
-            "story": turn["story"], "choices": choices[:3], "health": 100,
-            "step": 1, "game_over": False, "history": history,
+            "story": story, "choices": choices[:3],
+            "health": health_effect["new_health"], "step": 1,
+            "game_over": health_effect["game_over"], "history": history,
         }
 
     if in_cooldown:
@@ -464,15 +519,20 @@ def _run_turn(choice: str, genre: str, step: int, health: int, history: List[Dic
 
     history.append({"role": "player", "text": choice})
     instruction = "Narrate what happens next as a result of the player's choice."
-    turn = generate_llm_turn(genre, history, health, instruction)
-    if not turn:
+    story = generate_llm_story_beat(genre, history, instruction)
+    if not story:
         return generate_procedural_step(genre, step, health, choice)
-    history.append({"role": "narrator", "text": turn["story"]})
-    choices = turn["choices"] if len(turn.get("choices", [])) >= 2 else ["Move forward", "Look around", "Rest a moment"]
+    choices = generate_llm_choices_for_story(genre, story)
+    if len(choices) < 2:
+        choices = ["Move forward", "Look around", "Rest a moment"]
+    history.append({"role": "narrator", "text": story})
+    health_effect = generate_llm_health_effect(genre, history, health, story)
+    if health_effect.get("commentary"):
+        story = f"{story}\n\n{health_effect['commentary']}"
     return {
-        "story": turn["story"], "choices": choices[:3],
-        "health": turn["new_health"], "step": step + 1,
-        "game_over": turn["game_over"], "history": history,
+        "story": story, "choices": choices[:3],
+        "health": health_effect["new_health"], "step": step + 1,
+        "game_over": health_effect["game_over"], "history": history,
     }
 
 
@@ -508,15 +568,18 @@ async def game_choice(payload: dict):
 @fastapi_app.post("/api/config")
 async def update_config(body: dict):
     with _USER_CONFIG_LOCK:
-        if body.get("hf_token"):
-            _USER_CONFIG["hf_token"] = body["hf_token"].strip() or None
-        if body.get("model") and str(body["model"]).strip():
-            _USER_CONFIG["model"] = str(body["model"]).strip()
+        if "hf_token" in body:
+            _USER_CONFIG["hf_token"] = body["hf_token"].strip() if body["hf_token"] else None
+        if "model" in body:
+            _USER_CONFIG["model"] = body["model"].strip() if body["model"] else None
+        if "custom_endpoint" in body:
+            _USER_CONFIG["custom_endpoint"] = body["custom_endpoint"].strip() if body["custom_endpoint"] else None
         current = dict(_USER_CONFIG)
     return {
         "status": "ok",
         "model": current["model"] or TINYBARD_MODEL,
         "has_token": bool(current["hf_token"]),
+        "custom_endpoint": current["custom_endpoint"],
     }
 
 
@@ -527,11 +590,60 @@ async def get_config():
     return {
         "model": current["model"] or TINYBARD_MODEL,
         "has_token": bool(current["hf_token"]),
+        "custom_endpoint": current["custom_endpoint"],
     }
 
 
 # Mount static files
 fastapi_app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+@fastapi_app.on_event("startup")
+async def run_diagnostics():
+    log.info("Running startup diagnostics for HF Inference API models...")
+    import os
+    for k, v in sorted(os.environ.items()):
+        if any(secret in k.lower() for secret in ["key", "token", "pass", "secret"]):
+            log.info(f"ENV: {k} = [REDACTED]")
+        else:
+            log.info(f"ENV: {k} = {v}")
+            
+    # Test outbound internet
+    import httpx
+    try:
+        resp = httpx.get("https://httpbin.org/ip", timeout=5.0)
+        log.info(f"INTERNET TEST (httpbin): {resp.status_code} => {resp.text.strip()}")
+    except Exception as e:
+        log.info(f"INTERNET TEST (httpbin) => FAIL: {repr(e)}")
+    from huggingface_hub import InferenceClient
+    import os
+    token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACEHUB_API_TOKEN")
+    
+    models = [
+        "Qwen/Qwen2.5-1.5B-Instruct",
+        "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+        "google/gemma-2-2b-it",
+        "microsoft/Phi-3.5-mini-instruct",
+        "microsoft/Phi-4-mini-instruct",
+    ]
+    
+    for m in models:
+        # Test 1: plain text_generation
+        try:
+            client = InferenceClient(model=m, token=token)
+            res = client.text_generation("Say hello", max_new_tokens=10)
+            log.info(f"DIAGNOSTIC: {m} (text_gen) => SUCCESS: {res.strip()}")
+        except Exception as e:
+            log.info(f"DIAGNOSTIC: {m} (text_gen) => FAIL: {str(e)[:150]}")
+            
+        # Test 2: conversational
+        try:
+            client = InferenceClient(model=m, token=token)
+            # Try chat_completion but with explicit hf-inference provider if possible, or just default
+            res = client.chat_completion(messages=[{"role": "user", "content": "Say hello"}], max_tokens=10)
+            log.info(f"DIAGNOSTIC: {m} (chat) => SUCCESS: {res.choices[0].message.content.strip()}")
+        except Exception as e:
+            log.info(f"DIAGNOSTIC: {m} (chat) => FAIL: {str(e)[:150]}")
+
 
 # Mount Gradio app at /gradio — this creates the API + MCP endpoints
 gradio_blocks = create_gradio_app()

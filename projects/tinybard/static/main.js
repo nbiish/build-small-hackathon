@@ -253,6 +253,7 @@ const configClose = document.getElementById('tb-config-close');
 const configSave = document.getElementById('tb-config-save');
 const modelInput = document.getElementById('tb-model-input');
 const tokenInput = document.getElementById('tb-token-input');
+const endpointInput = document.getElementById('tb-endpoint-input');
 const configStatus = document.getElementById('tb-config-status');
 
 if (configBtn && configModal) {
@@ -260,6 +261,9 @@ if (configBtn && configModal) {
         const cfg = await fetch('/api/config').then(r => r.json());
         modelInput.value = cfg.model || '';
         tokenInput.value = '';
+        if (endpointInput) {
+            endpointInput.value = cfg.custom_endpoint || '';
+        }
         configStatus.textContent = '';
         configModal.style.display = 'flex';
     });
@@ -274,8 +278,12 @@ if (configBtn && configModal) {
 
     configSave.addEventListener('click', async () => {
         const body = {};
-        if (modelInput.value.trim()) body.model = modelInput.value.trim();
-        if (tokenInput.value.trim()) body.hf_token = tokenInput.value.trim();
+        // We always pass these fields to let user clear them (by passing empty strings or letting backend handle them)
+        body.model = modelInput.value.trim() || "";
+        body.hf_token = tokenInput.value.trim() || "";
+        if (endpointInput) {
+            body.custom_endpoint = endpointInput.value.trim() || "";
+        }
 
         const resp = await fetch('/api/config', {
             method: 'POST',
