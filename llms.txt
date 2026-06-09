@@ -1,26 +1,37 @@
-# Build Small Hackathon — PRD
-# Project Requirements Document
+# DOX framework
 
-> Three Gradio apps targeting all tracks + maximum badges + sponsor prizes.
-> Hack window: June 5-15, 2026. Deadline: June 15.
+- DOX is a highly performant `llms.txt` hierarchy installed here
+- Agent must follow DOX instructions across any edits
 
-> This file is the master PRD and stays English-only. Per-project UIs and
-> READMEs may use additional stylistic content for their own artifacts; this
-> doc does not enumerate those choices.
-
----
-
-## Overview
+## Purpose
 
 - **Name:** Build Small Hackathon 2026 — Team nbiish
-- **Version:** 0.5.0 — Cedar-Copper Edition (HF Inference API)
+- **Version:** 0.5.1 — Cedar-Copper Edition (HF Inference API + fixes)
 - **Aesthetic:** Cedar-copper visual language — sky-to-sunrise palette (water-blue → cedar → copper → sun-amber → birch-cream), biophilic motifs, sky-to-water gradient banners. Shared CSS variables live in `shared/cedar_copper_tokens.py`.
 - **Purpose:** Win prizes across tracks, badges, and sponsor categories by building delightful, useful AI apps that run locally.
 - **UX:** Gradio web apps (gr.Blocks + mount_gradio_app custom frontends), hosted on HF Spaces.
+- **Hack window:** June 5-15, 2026. Deadline: June 15.
 
----
+> This file is the master PRD and stays English-only. Per-project UIs and READMEs may use additional stylistic content for their own artifacts.
 
-## Rules
+## Core Contract
+
+- `llms.txt` files are binding work contracts for their subtrees
+- Work products, source materials, instructions, records, assets, and durable docs must stay understandable from the nearest applicable `llms.txt` plus every parent `llms.txt` above it
+
+## Read Before Editing
+
+1. Read the root `llms.txt`
+2. Identify every file or folder you expect to touch
+3. Walk from the repository root to each target path
+4. Read every `llms.txt` found along each route
+5. If a parent `llms.txt` lists a child `llms.txt` whose scope contains the path, read that child and continue from there
+6. Use the nearest `llms.txt` as the local contract and parent docs for repo-wide rules
+7. If docs conflict, the closer doc controls local work details, but no child doc may weaken DOX
+
+Do not rely on memory. Re-read the applicable DOX chain in the current session before editing.
+
+## Local Contracts
 
 ### Naming & Comments
 
@@ -31,14 +42,14 @@
 
 - Models ≤ 32B total params per project
 - Gradio app hosted as HF Space
-- Local-first (no cloud APIs = Off the Grid badge)
-- GGUF quantized models for local inference
+- HF Inference API for LLM calls (serverless, no local GGUF)
+- Per-project cooldowns on all HF Inference API calls
 - Python 3.10+ with pinned requirements
 - Cedar-copper aesthetic consistency across all UIs (palette tokens in `shared/cedar_copper_tokens.py`)
 
 ### Never
 
-- Cloud API calls in production path
+- llama-cpp-python in production (causes BUILD_ERROR on HF CPU tier)
 - Hardcoded secrets or API keys
 - Models > 32B params
 - Default Gradio look without customization attempt
@@ -49,8 +60,6 @@
 - If model ≤ 4B → tag Tiny Titan eligible
 - If using llama.cpp runtime → tag Llama Champion
 - If fine-tuning is done → publish model to HF Hub
-
----
 
 ## Infrastructure
 
@@ -103,13 +112,11 @@ Local servers were used during v0.4 development for visual inspection. v0.5+ pre
 | FocusFriend | http://localhost:7862/ | Gradio 6.0 | nbiish/focusfriend |
 | CritterCalm | http://localhost:7863/ | Gradio 6.0 | nbiish/crittercalm |
 
----
-
 ## Projects
 
 ### 1. CritterCalm (Backyard AI)
 
-- **Status:** Code complete. Deployed. HF Inference API + cooldowns wired for script generation. OmniVoice voice cloning still requires local install.
+- **Status:** Code complete. Deployed. HF Inference API + cooldowns wired for script generation. Voice cloning (OmniVoice) requires local install or Modal; Kokoro TTS fallback works on HF Space CPU tier.
 - **Stack:** OmniVoice (0.6B, local optional) + Kokoro TTS (82M, local optional) + Qwen2.5-7B (default) via HF Inference API
 - **Badges:** Off the Grid, Well-Tuned (TBD), Field Notes, Off-Brand
 - **GitHub:** github.com/nbiish/crittercalm
@@ -118,7 +125,7 @@ Local servers were used during v0.4 development for visual inspection. v0.5+ pre
 
 ### 2. FocusFriend (Thousand Token Wood)
 
-- **Status:** Code complete. Deployed. HF Inference API + cooldowns wired. Gradio 6 Chatbot dict-format fixed.
+- **Status:** Code complete. Deployed. HF Inference API + cooldowns wired. Was PAUSED on HF Spaces; factory_reboot needed.
 - **Stack:** Qwen2.5-7B (default) via HF Inference API
 - **Badges:** Off-Brand (sun-amber custom theme), Field Notes, Cooldowns badge
 - **GitHub:** github.com/nbiish/focusfriend
@@ -127,26 +134,26 @@ Local servers were used during v0.4 development for visual inspection. v0.5+ pre
 
 ### 3. TinyBard (Thousand Token Wood + Tiny Titan + Llama Champion)
 
-- **Status:** Code complete. Deployed. HF Inference API + cooldowns wired. Local test verified (procedural fallback + cooldown UI).
+- **Status:** Code complete. Deployed. HF Inference API + cooldowns wired. Had double-launch port conflict (uvicorn + Gradio SDK) — fixed by exporting `app` at module level.
 - **Concept:** ≤4B LLM generates 5-min interactive text adventures in a CRT terminal aesthetic.
 - **Stack:** Qwen2.5-1.5B (default) via HF Inference API + procedural fallback engine
 
----
+## Work Guidance
 
-## TODO
+### TODO
 
 > Keep tasks atomic and testable.
 
-### In Progress
+#### In Progress
 
-- [ ] Test CritterCalm voice cloning pipeline end-to-end
-- [ ] Test FocusFriend all 4 modes (Chat, Focus, Breathe, Meditate) with real model
+- [ ] Fix CritterCalm voice cloning for HF Space (Modal or local-only mode)
+- [ ] Test all 3 apps on HF Spaces with HF_TOKEN set
 - [ ] Record demo videos (2-3 min each)
 - [ ] Post to social media
 - [ ] Write Field Notes blog posts (3 — one per project)
 - [ ] Share agent traces to HF Hub (Sharing is Caring badge)
 
-### Completed
+#### Completed
 
 - [x] CritterCalm v1 code complete (11 files) — Cedar-copper UI
 - [x] FocusFriend v1 code complete (16 files) — Cedar-copper UI + Gradio 6 dict Chatbot
@@ -166,9 +173,7 @@ Local servers were used during v0.4 development for visual inspection. v0.5+ pre
 - [x] **v0.5: Cooldown system** in `shared/inference_client.py` to protect HF/Modal credit budget
 - [x] **v0.5: TinyBard local test** — procedural fallback works when no HF_TOKEN; cooldown UI shows in footer
 
----
-
-## Short-term Goals
+### Short-term Goals
 
 - Iterate on the live HF Spaces (nbiish/tinybard, nbiish/focusfriend, nbiish/crittercalm)
 - Set HF_TOKEN + INFERENCE_MODEL Space secrets to enable real LLM-backed adventures
@@ -177,7 +182,66 @@ Local servers were used during v0.4 development for visual inspection. v0.5+ pre
 - Share agent traces for Sharing is Caring badge
 - Polish UIs for demo appeal
 
----
+## Update After Editing
+
+Every meaningful change requires a DOX pass before the task is done.
+
+Update the closest owning `llms.txt` when a change affects:
+
+- purpose, scope, ownership, or responsibilities
+- durable structure, contracts, workflows, or operating rules
+- required inputs, outputs, permissions, constraints, side effects, or artifacts
+- user preferences about behavior, communication, process, organization, or quality
+- `llms.txt` creation, deletion, move, rename, or index contents
+
+Update parent docs when parent-level structure, ownership, workflow, or child index changes. Update child docs when parent changes alter local rules. Remove stale or contradictory text immediately. Small edits that do not change behavior or contracts may leave docs unchanged, but the DOX pass still must happen.
+
+## Hierarchy
+
+- Root `llms.txt` is the DOX rail: project-wide instructions, global preferences, durable workflow rules, and the top-level Child DOX Index
+- Child `llms.txt` files own domain-specific instructions and their own Child DOX Index
+- Each parent explains what its direct children cover and what stays owned by the parent
+- The closer a doc is to the work, the more specific and practical it must be
+
+## Child Doc Shape
+
+- Create a child `llms.txt` when a folder becomes a durable boundary with its own purpose, rules, responsibilities, workflow, materials, or quality standards
+- Work Guidance must reflect the current standards of the project or user instructions; if there are no specific standards or instructions yet, leave it empty
+- Verification must reflect an existing check; if no verification framework exists yet, leave it empty and update it when one exists
+
+Default section order:
+- Purpose
+- Ownership
+- Local Contracts
+- Work Guidance
+- Verification
+- Child DOX Index
+
+## Style
+
+- Keep docs concise, current, and operational
+- Document stable contracts, not diary entries
+- Put broad rules in parent docs and concrete details in child docs
+- Prefer direct bullets with explicit names
+- Do not duplicate rules across many files unless each scope needs a local version
+- Delete stale notes instead of explaining history
+- Trim obvious statements, repeated rules, misplaced detail, and warnings for risks that no longer exist
+
+## Closeout
+
+1. Re-check changed paths against the DOX chain
+2. Update nearest owning docs and any affected parents or children
+3. Refresh every affected Child DOX Index
+4. Remove stale or contradictory text
+5. Run existing verification when relevant
+6. Report any docs intentionally left unchanged and why
+
+## Verification
+
+Run local servers to verify apps:
+- TinyBard: `cd projects/tinybard && python app.py` → http://localhost:7861/
+- FocusFriend: `cd projects/focusfriend && python app.py` → http://localhost:7862/
+- CritterCalm: `cd projects/crittercalm && python app.py` → http://localhost:7863/
 
 ## Reference
 
@@ -189,3 +253,24 @@ Local servers were used during v0.4 development for visual inspection. v0.5+ pre
 - ML Intern: github.com/huggingface/ml-intern
 - HF Agents CLI: huggingface.co/docs/hub/en/agents-cli
 - Gradio MCP: gradio.app/guides/model-context-protocol
+
+## User Preferences
+
+When the user requests a durable behavior change, record it here or in the relevant child `llms.txt`
+
+## Child DOX Index
+
+### projects/crittercalm/
+- Backyard AI track — CritterCalm calming audio generator for pets
+- Stack: OmniVoice (local) + Kokoro TTS (fallback) + HF Inference API (scripts)
+
+### projects/focusfriend/
+- Thousand Token Wood track — FocusFriend wellness companion (ASCII Pip)
+- Stack: HF Inference API (Qwen2.5-7B) + cooldowns
+
+### projects/tinybard/
+- Thousand Token Wood + Tiny Titan + Llama Champion tracks
+- Stack: HF Inference API (Qwen2.5-1.5B) + procedural fallback + FastAPI + CRT frontend
+
+### shared/
+- Cedar-copper aesthetic tokens and shared utilities
