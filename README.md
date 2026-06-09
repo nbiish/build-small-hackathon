@@ -1,3 +1,27 @@
+---
+title: ᐴ TinyBard ᔔ
+emoji: ☀️
+colorFrom: blue
+colorTo: yellow
+sdk: gradio
+sdk_version: 6.0.0
+app_file: projects/tinybard/app.py
+pinned: false
+license: apache-2.0
+tags:
+  - text-adventure
+  - interactive-fiction
+  - thousand-token-wood
+  - build-small-hackathon
+  - tiny-titan
+  - off-brand
+  - mcp-server
+  - anishinaabe
+  - solarpunk
+  - inference-api
+  - cooldowns
+---
+
 # ◈──◆──◇ ANISHINAABE-MOWIN / OBIJWE BUILD SMALL HACKATHON ◇──◆──◈
 
 > **ᐴ Team coordination for the Hugging Face Build Small Hackathon (June 5-15, 2026). ᔔ**
