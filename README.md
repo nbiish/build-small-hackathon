@@ -14,7 +14,8 @@ build-small-hackathon/
 │   ├── focusfriend/       # ☼  Pip, your cedar-and-sun companion
 │   ├── tinybard/          # ☼  Fire-fly Storyteller · CRT Terminal
 │   └── shared/
-│       └── anishinaabe_solarpunk.py   # ☼ shared design tokens
+│       ├── cedar_copper_tokens.py  # ☼ Cedar-copper aesthetic tokens
+│       └── inference_client.py        # ☼ HF Inference API + cooldowns
 └── .agents/               # Skills & task tracking
 ```
 
@@ -65,4 +66,4 @@ All three apps share a unified visual language:
 
 ---
 
-◈──◆──◇ ☼ Cedar Edition · v0.4.0 · Anishinaabe Solarpunk ◇──◆──◈
+◈──◆──◇ ☼ Cedar-Copper Edition · v0.5.1 · Anishinaabe Solarpunk ◇──◆──◈
