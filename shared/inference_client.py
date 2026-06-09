@@ -106,6 +106,7 @@ def _get_client():
     return InferenceClient(
         model=INFERENCE_MODEL,
         token=HF_TOKEN,
+        base_url="https://api-inference.huggingface.co",
     )
 def generate(
     project: str,
