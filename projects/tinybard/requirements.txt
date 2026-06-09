@@ -1,7 +1,18 @@
 # TinyBard — Micro Text Adventure Generator
 # Python 3.10+
+#
+# Inference is via the Hugging Face Inference API (no local GGUF,
+# no llama-cpp-python compile). Cooldown is enforced in
+# `shared/inference_client.py` to protect your credit budget.
+#
+# Set these Space secrets/variables to configure:
+#   HF_TOKEN              — your HF token (anonymous works for many small models)
+#   INFERENCE_MODEL       — model id (default: Qwen/Qwen2.5-1.5B-Instruct)
+#   TINYBARD_COOLDOWN_SECONDS — gap between inference calls (default 6)
+#   INFERENCE_PROVIDER    — "hf-inference" (default, free serverless) or paid
+#   INFERENCE_MAX_TOKENS  — per-call token cap (default 220)
 
 gradio>=5.0
-numpy>=1.24
-llama-cpp-python>=0.3.0
+fastapi>=0.110
 huggingface_hub>=0.20
+uvicorn[standard]>=0.27

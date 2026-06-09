@@ -17,6 +17,7 @@ import os
 import json
 import random
 import logging
+import sys
 from pathlib import Path
 from typing import Optional, Dict, List
 
@@ -25,6 +26,19 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from gradio import mount_gradio_app
+
+# Inference client with cooldown (no local GGUF, no llama-cpp-python build!)
+# Path layout: monorepo/shared/inference_client.py — go up two parents from this file.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+from shared.inference_client import (
+    InferenceResult,
+    cooldown_status,
+    cooldown_remaining,
+    cooldown_active,
+    generate as inference_generate,
+    chat_messages,
+    INFERENCE_MODEL,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -38,46 +52,34 @@ log = logging.getLogger("tinybard")
 BASE_DIR = Path(__file__).parent
 STATIC_DIR = BASE_DIR / "static"
 
-MODEL_PATH = os.environ.get(
-    "TINYBARD_MODEL_PATH",
-    str(Path("/Volumes/1tb-sandisk/ml-models/huggingface/models--mradermacher--VibeThinker-1.5B-GGUF/snapshots/d0d66139a78030a92a582f966b0f7cbbb3b19406/VibeThinker-1.5B.Q8_0.gguf"))
-)
+# Use HF Inference API (VibeThinker 1.5B by default — small, fast, free tier).
+# Override via Space env var: INFERENCE_MODEL.
+# Cooldown enforced in shared.inference_client.
+TINYBARD_MODEL = os.environ.get("TINYBARD_MODEL", INFERENCE_MODEL)
 
 # ---------------------------------------------------------------------------
 # Llama.cpp Inference Setup
 # ---------------------------------------------------------------------------
-_llm = None
-_llm_failed = False
+# No local LLM state — every inference call goes through the HF Inference API
+# with cooldown enforcement. Procedural fallback is always available.
 
 
-def get_llm():
-    """Lazy-load the GGUF model via llama-cpp-python."""
-    global _llm, _llm_failed
-    if _llm is not None:
-        return _llm
-    if _llm_failed:
-        return None
+def llm_available() -> bool:
+    """True if we *might* succeed at an inference call (cooldown not active,
+    HF_TOKEN configured, model id is set)."""
+    import os
+    if not os.environ.get("HF_TOKEN") and not os.environ.get("HUGGINGFACEHUB_API_TOKEN"):
+        # Inference API still works anonymously for some models, so don't gate hard.
+        pass
+    return bool(TINYBARD_MODEL) and not cooldown_active("tinybard")
 
-    if not Path(MODEL_PATH).exists():
-        log.warning(f"Model file not found at {MODEL_PATH}. Fallback mode active.")
-        _llm_failed = True
-        return None
 
-    try:
-        from llama_cpp import Llama
-        log.info(f"Loading VibeThinker-1.5B from {MODEL_PATH} ...")
-        _llm = Llama(
-            model_path=MODEL_PATH,
-            n_ctx=2048,
-            n_threads=int(os.environ.get("TINYBARD_THREADS", "4")),
-            verbose=False,
-        )
-        log.info("Model loaded successfully ✓")
-        return _llm
-    except Exception as e:
-        log.error(f"Failed to load LLM model: {e}")
-        _llm_failed = True
-        return None
+def last_inference_status() -> dict:
+    """Snapshot of the current cooldown + model for /api/model_status."""
+    return {
+        "model": TINYBARD_MODEL,
+        "cooldown": cooldown_status("tinybard"),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -189,44 +191,72 @@ def generate_procedural_step(genre: str, step: int, health: int, choice: str = "
 
 
 # ---------------------------------------------------------------------------
-# LLM Generation Logic
+# LLM Generation Logic (HF Inference API + cooldown)
 # ---------------------------------------------------------------------------
-def generate_llm_story(prompt: str, max_tokens: int = 150) -> str:
-    """Generate story text via llama.cpp."""
-    llm = get_llm()
-    if not llm:
+def _parse_messages(genre: str, history: List[Dict[str, str]], next_instruction: str) -> list[Dict[str, str]]:
+    """Translate internal history into OpenAI-style chat messages."""
+    system = (
+        "You are the narrator of an interactive text adventure game. "
+        f"Genre: {genre}. Write in the second person ('You...'). "
+        "Keep descriptions highly atmospheric but short (under 3 sentences). "
+        "Focus on action, mystery, and choice. Do not offer numbered choices unless asked."
+    )
+    msgs: List[Dict[str, str]] = [{"role": "system", "content": system}]
+    for h in (history or []):
+        if h.get("role") == "player":
+            msgs.append({"role": "user", "content": h["text"]})
+        elif h.get("role") == "narrator":
+            msgs.append({"role": "assistant", "content": h["text"]})
+    msgs.append({"role": "user", "content": next_instruction})
+    return msgs
+
+
+def generate_llm_story(
+    genre: str,
+    history: List[Dict[str, str]],
+    next_instruction: str,
+    max_tokens: int = 180,
+) -> str:
+    """Generate story text via HF Inference API (with cooldown)."""
+    if cooldown_active("tinybard"):
+        log.info("tinybard inference skipped (cooldown active)")
         return ""
     try:
-        response = llm(
-            prompt,
-            max_tokens=max_tokens,
+        msgs = _parse_messages(genre, history, next_instruction)
+        result = inference_generate(
+            project="tinybard",
+            messages=msgs,
+            max_new_tokens=max_tokens,
             temperature=0.7,
-            stop=["\n\n", "User:", "Narrator:"],
         )
-        return response["choices"][0]["text"].strip()
+        return result.text
+    except RuntimeError:
+        # Cooldown — let caller fall back
+        return ""
     except Exception as e:
-        log.error(f"LLM generation error: {e}")
+        log.warning(f"HF Inference error (fallback to procedural): {e}")
         return ""
 
 
-def format_prompt(genre: str, history: List[Dict[str, str]], next_instruction: str) -> str:
-    """Build the narrative prompt for the LLM."""
-    prompt = (
-        "You are the narrator of an interactive text adventure game.\n"
-        f"Genre: {genre}\n"
-        "Rules:\n"
-        "1. Write in the second person ('You...').\n"
-        "2. Keep descriptions highly atmospheric, but short (under 3 sentences).\n"
-        "3. Focus on action, mystery, and choice.\n\n"
+def generate_llm_choices(genre: str, story_context: str) -> List[str]:
+    """Ask the LLM to produce 3 short distinct choices for the player."""
+    if cooldown_active("tinybard"):
+        return []
+    system = (
+        "You generate 3 short, distinct player choices for an interactive text adventure. "
+        "Output exactly in the format: 1. <choice> | 2. <choice> | 3. <choice>"
     )
-    for h in history:
-        if h["role"] == "player":
-            prompt += f"Player choice: {h['text']}\n"
-        else:
-            prompt += f"Narrator: {h['text']}\n"
-
-    prompt += f"{next_instruction}\n"
-    return prompt
+    user = f"Genre: {genre}. Last story beat: {story_context[:400]}. Give 3 choices."
+    try:
+        result = inference_generate(
+            project="tinybard",
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+            max_new_tokens=80,
+            temperature=0.8,
+        )
+        return _parse_choices(result.text)
+    except Exception:
+        return []
 
 
 # ---------------------------------------------------------------------------
@@ -257,18 +287,11 @@ def create_gradio_app() -> gr.Blocks:
             if genre not in ["fantasy", "scifi", "cyberpunk"]:
                 genre = "fantasy"
 
-            llm = get_llm()
-            if not llm:
-                result = generate_procedural_step(genre, 0, 100)
-                return (
-                    result["story"], result["choices"], result["health"],
-                    result["step"], result["game_over"],
-                    json.dumps(result.get("history", []))
-                )
-
+            # Try LLM first (will skip if cooldown is active)
             instruction = "Narrate the beginning of the adventure. What happens first? Do not offer choices yet."
-            story = generate_llm_story(format_prompt(genre, [], instruction))
+            story = generate_llm_story(genre, [], instruction)
             if not story:
+                # Procedural fallback
                 result = generate_procedural_step(genre, 0, 100)
                 return (
                     result["story"], result["choices"], result["health"],
@@ -277,15 +300,11 @@ def create_gradio_app() -> gr.Blocks:
                 )
 
             history = [{"role": "narrator", "text": story}]
-            choices_instruction = (
-                "Provide exactly 3 short, distinct choices for the player. "
-                "Format: 1. [choice 1] | 2. [choice 2] | 3. [choice 3]"
-            )
-            choices_text = generate_llm_story(format_prompt(genre, history, choices_instruction), max_tokens=60)
-
-            choices = _parse_choices(choices_text)
+            choices = generate_llm_choices(genre, story)
             if len(choices) < 2:
-                choices = ["Explore the area", "Check your equipment", "Proceed carefully"]
+                # Use the procedural choices
+                fallback = generate_procedural_step(genre, 0, 100)
+                choices = fallback["choices"]
 
             return (story, choices[:3], 100, 1, False, json.dumps(history))
 
@@ -296,18 +315,10 @@ def create_gradio_app() -> gr.Blocks:
             except Exception:
                 history = []
 
-            llm = get_llm()
             step = int(step)
             health = int(health)
 
-            if not llm:
-                result = generate_procedural_step(genre, step, health, choice)
-                return (
-                    result["story"], result["choices"], result["health"],
-                    result["step"], result["game_over"],
-                    json.dumps(result.get("history", history))
-                )
-
+            # First try LLM narration
             history.append({"role": "player", "text": choice})
 
             health_delta = random.choice([-15, 0, 10])
@@ -315,7 +326,7 @@ def create_gradio_app() -> gr.Blocks:
 
             if new_health <= 0:
                 instruction = "The player has run out of health. Narrate a quick, dramatic end. Game Over."
-                story = generate_llm_story(format_prompt(genre, history, instruction))
+                story = generate_llm_story(genre, history, instruction)
                 return (
                     story or "Your strength fails. The adventure ends in darkness.",
                     [], 0, step + 1, True, json.dumps(history)
@@ -323,14 +334,14 @@ def create_gradio_app() -> gr.Blocks:
 
             if step >= 4:
                 instruction = "Narrate the final glorious victory. The adventure ends in success."
-                story = generate_llm_story(format_prompt(genre, history, instruction))
+                story = generate_llm_story(genre, history, instruction)
                 return (
                     story or "You have achieved your goal! You are victorious!",
                     [], new_health, step + 1, True, json.dumps(history)
                 )
 
             instruction = "Narrate what happens next as a result of the player's choice."
-            story = generate_llm_story(format_prompt(genre, history, instruction))
+            story = generate_llm_story(genre, history, instruction)
             if not story:
                 result = generate_procedural_step(genre, step, health, choice)
                 return (
@@ -341,13 +352,7 @@ def create_gradio_app() -> gr.Blocks:
 
             history.append({"role": "narrator", "text": story})
 
-            choices_instruction = (
-                "Provide exactly 3 short, distinct choices. "
-                "Format: 1. [choice 1] | 2. [choice 2] | 3. [choice 3]"
-            )
-            choices_text = generate_llm_story(format_prompt(genre, history, choices_instruction), max_tokens=60)
-
-            choices = _parse_choices(choices_text)
+            choices = generate_llm_choices(genre, story)
             if len(choices) < 2:
                 choices = ["Move forward", "Look around", "Rest a moment"]
 
@@ -400,13 +405,8 @@ async def homepage():
     return HTMLResponse("<h1>TinyBard retro terminal under construction!</h1>")
 @fastapi_app.get("/api/model_status")
 async def model_status():
-    """Check if the LLM is loaded."""
-    llm = get_llm()
-    return {
-        "available": llm is not None,
-        "model_path": MODEL_PATH,
-        "fallback": _llm_failed
-    }
+    """Check the inference client + cooldown status."""
+    return last_inference_status()
 
 
 # ---------------------------------------------------------------------------
@@ -418,23 +418,20 @@ def _run_turn(choice: str, genre: str, step: int, health: int, history: List[Dic
     Returns a dict the frontend can consume directly. Used by both the
     FastAPI /api/game/* endpoints and the Gradio MCP tools.
     """
-    llm = get_llm()
+    # Cooldown short-circuit: if active, the game just uses the procedural
+    # engine for this turn. This protects your HF/Modal credit budget.
+    in_cooldown = cooldown_active("tinybard")
 
     if step == 0:
         # New game
-        if not llm:
+        if in_cooldown:
             return generate_procedural_step(genre, 0, 100)
         instruction = "Narrate the beginning of the adventure. What happens first? Do not offer choices yet."
-        story = generate_llm_story(format_prompt(genre, [], instruction))
+        story = generate_llm_story(genre, [], instruction)
         if not story:
             return generate_procedural_step(genre, 0, 100)
         history = [{"role": "narrator", "text": story}]
-        choices_instruction = (
-            "Provide exactly 3 short, distinct choices for the player. "
-            "Format: 1. [choice 1] | 2. [choice 2] | 3. [choice 3]"
-        )
-        choices_text = generate_llm_story(format_prompt(genre, history, choices_instruction), max_tokens=60)
-        choices = _parse_choices(choices_text)
+        choices = generate_llm_choices(genre, story)
         if len(choices) < 2:
             choices = ["Explore the area", "Check your equipment", "Proceed carefully"]
         return {
@@ -443,7 +440,7 @@ def _run_turn(choice: str, genre: str, step: int, health: int, history: List[Dic
         }
 
     # Subsequent turn
-    if not llm:
+    if in_cooldown:
         return generate_procedural_step(genre, step, health, choice)
 
     history.append({"role": "player", "text": choice})
@@ -452,7 +449,7 @@ def _run_turn(choice: str, genre: str, step: int, health: int, history: List[Dic
 
     if new_health <= 0:
         instruction = "The player has run out of health. Narrate a quick, dramatic end. Game Over."
-        story = generate_llm_story(format_prompt(genre, history, instruction))
+        story = generate_llm_story(genre, history, instruction)
         return {
             "story": story or "Your strength fails. The adventure ends in darkness.",
             "choices": [], "health": 0, "step": step + 1, "game_over": True,
@@ -461,7 +458,7 @@ def _run_turn(choice: str, genre: str, step: int, health: int, history: List[Dic
 
     if step >= 4:
         instruction = "Narrate the final glorious victory. The adventure ends in success."
-        story = generate_llm_story(format_prompt(genre, history, instruction))
+        story = generate_llm_story(genre, history, instruction)
         return {
             "story": story or "You have achieved your goal! You are victorious!",
             "choices": [], "health": new_health, "step": step + 1, "game_over": True,
@@ -469,17 +466,12 @@ def _run_turn(choice: str, genre: str, step: int, health: int, history: List[Dic
         }
 
     instruction = "Narrate what happens next as a result of the player's choice."
-    story = generate_llm_story(format_prompt(genre, history, instruction))
+    story = generate_llm_story(genre, history, instruction)
     if not story:
         return generate_procedural_step(genre, step, health, choice)
     history.append({"role": "narrator", "text": story})
 
-    choices_instruction = (
-        "Provide exactly 3 short, distinct choices. "
-        "Format: 1. [choice 1] | 2. [choice 2] | 3. [choice 3]"
-    )
-    choices_text = generate_llm_story(format_prompt(genre, history, choices_instruction), max_tokens=60)
-    choices = _parse_choices(choices_text)
+    choices = generate_llm_choices(genre, story)
     if len(choices) < 2:
         choices = ["Move forward", "Look around", "Rest a moment"]
     return {

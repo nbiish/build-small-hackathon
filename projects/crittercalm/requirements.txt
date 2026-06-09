@@ -1,24 +1,18 @@
 # CritterCalm — AI Voice Cloning Animal Soother
 # Python 3.10+
+#
+# Inference is via the Hugging Face Inference API. No local GGUF,
+# no llama-cpp-python compile step. Cooldown is enforced in
+# `shared/inference_client.py` to protect your credit budget.
+#
+# Space env vars (Settings → Variables and secrets):
+#   HF_TOKEN                     — your HF token (anonymous works for many models)
+#   INFERENCE_MODEL              — default model id
+#   CRITTERCALM_MODEL            — override the model for this project
+#   CRITTERCALM_COOLDOWN_SECONDS — gap between inference calls (default 12)
+#   INFERENCE_PROVIDER           — "hf-inference" (default) or paid provider
+#   INFERENCE_MAX_TOKENS         — per-call cap (default 220)
 
-# === Core ===
 gradio>=5.0
 numpy>=1.24
-soundfile>=0.12
-torch>=2.0
-
-# === Voice Cloning ===
-omnivoice>=0.1.0
-
-# === LLM Inference (Dolphin-X1-8B) ===
-llama-cpp-python>=0.3.0
-
-# === Fallback TTS ===
-kokoro-onnx>=0.2.0
-
-# === Audio Processing ===
-librosa>=0.10
-scipy>=1.10
-
-# === Utilities ===
 huggingface_hub>=0.20
