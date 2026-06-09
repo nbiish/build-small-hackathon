@@ -6,7 +6,7 @@
 ## Purpose
 
 - **Name:** Build Small Hackathon 2026 — Team nbiish
-- **Version:** 0.5.1 — Cedar-Copper Edition (HF Inference API + fixes)
+- **Version:** 0.6.0 — Cedar-Copper Edition (Infinite LLM play + Modal vLLM support)
 - **Aesthetic:** Cedar-copper visual language — sky-to-sunrise palette (water-blue → cedar → copper → sun-amber → birch-cream), biophilic motifs, sky-to-water gradient banners. Shared CSS variables live in `shared/cedar_copper_tokens.py`.
 - **Purpose:** Win prizes across tracks, badges, and sponsor categories by building delightful, useful AI apps that run locally.
 - **UX:** Gradio web apps (gr.Blocks + mount_gradio_app custom frontends), hosted on HF Spaces.
@@ -132,11 +132,12 @@ Local servers were used during v0.4 development for visual inspection. v0.5+ pre
 - **HF Space:** huggingface.co/spaces/nbiish/focusfriend
 - **Standalone repo:** /Volumes/1tb-sandisk/code-external/focusfriend-repo
 
-### 3. TinyBard (Thousand Token Wood + Tiny Titan + Llama Champion)
+### 3. TinyBard (Thousand Token Wood + Tiny Titan + Llama Champion + Modal)
 
-- **Status:** Code complete. Deployed. HF Inference API + cooldowns wired. Had double-launch port conflict (uvicorn + Gradio SDK) — fixed by exporting `app` at module level.
-- **Concept:** ≤4B LLM generates 5-min interactive text adventures in a CRT terminal aesthetic.
-- **Stack:** Qwen2.5-1.5B (default) via HF Inference API + procedural fallback engine
+- **Status:** Code complete. Deployed. HF Inference API + Modal custom vLLM + cooldowns wired. Infinite turn loop complete.
+- **Concept:** Infinite generative AI text adventure in a CRT terminal aesthetic (≤4B or ≤12B models). 
+- **Stack:** Qwen2.5-1.5B (default) / Phi-4-mini / Gemma 4 / custom Modal vLLM + procedural fallback engine
+- **Modal Support:** A custom vLLM deployment script is provided at `projects/tinybard/modal_inference.py`. Users can run `modal deploy` to host their own private OpenAI-compatible endpoint and paste it into the UI configuration modal.
 
 ## Work Guidance
 
@@ -269,8 +270,9 @@ When the user requests a durable behavior change, record it here or in the relev
 - Stack: HF Inference API (Qwen2.5-7B) + cooldowns
 
 ### projects/tinybard/
-- Thousand Token Wood + Tiny Titan + Llama Champion tracks
-- Stack: HF Inference API (Qwen2.5-1.5B) + procedural fallback + FastAPI + CRT frontend
+- Thousand Token Wood + Tiny Titan + Llama Champion + Modal tracks
+- Stack: HF Inference API / Modal vLLM + procedural fallback + FastAPI + CRT frontend
+- Mode: Infinite generative AI text adventure (ends only on health <= 0 or reaches 100+). Uses 3 separate LLM calls per turn for story, choices, and health deltas.
 
 ### shared/
 - Cedar-copper aesthetic tokens and shared utilities
