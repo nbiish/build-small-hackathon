@@ -23,7 +23,7 @@
             <div class="terminal" id="terminal">
                 <div class="terminal-header">
                     <span class="prompt">ᐴ TINYBARD v1.0 ᔔ  ·  GIIZHI-AADIZOKED</span>
-                    <span class="status" id="health-bar">NOOSISKAAZOWIN: <span id="health-val">100</span></span>
+                    <span class="status" id="health-bar">NOOSISKAAZOWIN: <span id="health-val">100</span></span><button id="config-btn" style="float:right;background:none;border:1px solid var(--asp-amber,#FFB347);color:var(--asp-sun,#F2A93B);cursor:pointer;font-family:monospace;font-size:0.75rem;padding:0.15rem 0.4rem;border-radius:2px;">⚙ CONFIG</button>
                 </div>
 
                 <div class="terminal-body" id="output">
@@ -69,5 +69,25 @@
     </div>
 
     <script type="module" src="/static/main.js"></script>
+
+    <!-- User config modal -->
+    <div id="tb-config-modal" class="tb-modal-overlay" style="display:none;">
+        <div class="tb-modal">
+            <button class="tb-close" id="tb-config-close">✕</button>
+            <h3>⚙ Inference Configuration</h3>
+            <p style="font-size:0.8rem;color:var(--asp-moss,#588157);">
+                Provide your own HuggingFace token to unlock models that need auth.
+                Your token lives in browser memory only — never sent anywhere except api.huggingface.co.
+            </p>
+            <label for="tb-model-input">Model ID</label>
+            <input type="text" id="tb-model-input" placeholder="Qwen/Qwen2.5-1.5B-Instruct" />
+
+            <label for="tb-token-input">HF Token (optional)</label>
+            <input type="password" id="tb-token-input" placeholder="hf_..." />
+
+            <button id="tb-config-save">Save & Reload</button>
+            <span id="tb-config-status" style="margin-left:0.5rem;color:var(--asp-moss,#588157);"></span>
+        </div>
+    </div>
 </body>
 </html>
