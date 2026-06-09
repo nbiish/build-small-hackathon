@@ -25,6 +25,7 @@ import gradio as gr
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 from gradio import mount_gradio_app
 
 # Inference client with cooldown (no local GGUF, no llama-cpp-python build!)
