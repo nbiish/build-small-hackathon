@@ -179,7 +179,8 @@ def generate_procedural_step(genre: str, step: int, health: int, choice: str = "
             "choices": genre_data["nodes"][0]["choices"],
             "health": health,
             "step": 1,
-            "game_over": False
+            "game_over": False,
+            "genre": genre,
         }
 
     health_delta = random.choice([-15, 0, 10])
@@ -191,16 +192,8 @@ def generate_procedural_step(genre: str, step: int, health: int, choice: str = "
             "choices": [],
             "health": 0,
             "step": step + 1,
-            "game_over": True
-        }
-
-    if step >= 4:
-        return {
-            "story": f"After choosing: '{choice}'. " + genre_data["win"],
-            "choices": [],
-            "health": new_health,
-            "step": step + 1,
-            "game_over": True
+            "game_over": True,
+            "genre": genre,
         }
 
     node = genre_data["nodes"][step % len(genre_data["nodes"])]
@@ -209,7 +202,8 @@ def generate_procedural_step(genre: str, step: int, health: int, choice: str = "
         "choices": node["choices"],
         "health": new_health,
         "step": step + 1,
-        "game_over": False
+        "game_over": False,
+        "genre": genre,
     }
 
 
@@ -355,14 +349,7 @@ def create_gradio_app() -> gr.Blocks:
                     [], 0, step + 1, True, json.dumps(history)
                 )
 
-            if step >= 4:
-                instruction = "Narrate the final glorious victory. The adventure ends in success."
-                story = generate_llm_story(genre, history, instruction)
-                return (
-                    story or "You have achieved your goal! You are victorious!",
-                    [], new_health, step + 1, True, json.dumps(history)
-                )
-
+            # No step cap — adventure continues infinitely until health reaches 0
             instruction = "Narrate what happens next as a result of the player's choice."
             story = generate_llm_story(genre, history, instruction)
             if not story:
@@ -460,6 +447,7 @@ def _run_turn(choice: str, genre: str, step: int, health: int, history: List[Dic
         return {
             "story": story, "choices": choices[:3], "health": 100,
             "step": 1, "game_over": False, "history": history,
+            "genre": genre,
         }
 
     # Subsequent turn
@@ -476,16 +464,7 @@ def _run_turn(choice: str, genre: str, step: int, health: int, history: List[Dic
         return {
             "story": story or "Your strength fails. The adventure ends in darkness.",
             "choices": [], "health": 0, "step": step + 1, "game_over": True,
-            "history": history,
-        }
-
-    if step >= 4:
-        instruction = "Narrate the final glorious victory. The adventure ends in success."
-        story = generate_llm_story(genre, history, instruction)
-        return {
-            "story": story or "You have achieved your goal! You are victorious!",
-            "choices": [], "health": new_health, "step": step + 1, "game_over": True,
-            "history": history,
+            "history": history, "genre": genre,
         }
 
     instruction = "Narrate what happens next as a result of the player's choice."
@@ -500,6 +479,7 @@ def _run_turn(choice: str, genre: str, step: int, health: int, history: List[Dic
     return {
         "story": story, "choices": choices[:3], "health": new_health,
         "step": step + 1, "game_over": False, "history": history,
+        "genre": genre,
     }
 
 
@@ -531,6 +511,102 @@ async def game_choice(payload: dict):
         health=int(payload.get("health", 100)),
         history=payload.get("history", []),
     )
+
+# ---------------------------------------------------------------------------
+# Save/Load System
+# ---------------------------------------------------------------------------
+SAVES_DIR = BASE_DIR / "saves"
+SAVES_DIR.mkdir(exist_ok=True)
+
+
+@fastapi_app.post("/api/game/save")
+async def game_save(payload: dict):
+    """Save current game state to a named slot.
+
+    Body: {slot_name, genre, step, health, history, game_over}
+    """
+    slot_name = payload.get("slot_name", "autosave")
+    # Sanitize slot name for filesystem
+    safe_name = "".join(c for c in slot_name if c.isalnum() or c in "-_ ").strip()
+    if not safe_name:
+        safe_name = "autosave"
+
+    save_data = {
+        "slot_name": safe_name,
+        "genre": payload.get("genre", "fantasy"),
+        "step": int(payload.get("step", 0)),
+        "health": int(payload.get("health", 100)),
+        "history": payload.get("history", []),
+        "game_over": payload.get("game_over", False),
+        "timestamp": __import__("time").time(),
+    }
+
+    save_path = SAVES_DIR / f"{safe_name}.json"
+    save_path.write_text(json.dumps(save_data, indent=2))
+    log.info(f"Game saved to slot: {safe_name}")
+    return {"status": "ok", "slot_name": safe_name, "timestamp": save_data["timestamp"]}
+
+
+@fastapi_app.get("/api/game/saves")
+async def game_saves():
+    """List all saved games."""
+    saves = []
+    for f in sorted(SAVES_DIR.glob("*.json")):
+        try:
+            data = json.loads(f.read_text())
+            saves.append({
+                "slot_name": data.get("slot_name", f.stem),
+                "genre": data.get("genre", "unknown"),
+                "step": data.get("step", 0),
+                "health": data.get("health", 0),
+                "timestamp": data.get("timestamp", 0),
+                "game_over": data.get("game_over", False),
+            })
+        except Exception:
+            continue
+    return {"saves": saves}
+
+
+@fastapi_app.post("/api/game/load")
+async def game_load(payload: dict):
+    """Load a saved game by slot name.
+
+    Body: {slot_name}
+    """
+    slot_name = payload.get("slot_name", "")
+    safe_name = "".join(c for c in slot_name if c.isalnum() or c in "-_ ").strip()
+    save_path = SAVES_DIR / f"{safe_name}.json"
+
+    if not save_path.exists():
+        return {"status": "error", "message": f"Save '{safe_name}' not found"}
+
+    try:
+        data = json.loads(save_path.read_text())
+        return {
+            "status": "ok",
+            "slot_name": data.get("slot_name", safe_name),
+            "genre": data.get("genre", "fantasy"),
+            "step": data.get("step", 0),
+            "health": data.get("health", 100),
+            "history": data.get("history", []),
+            "game_over": data.get("game_over", False),
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@fastapi_app.delete("/api/game/save/{slot_name}")
+async def game_delete_save(slot_name: str):
+    """Delete a saved game."""
+    safe_name = "".join(c for c in slot_name if c.isalnum() or c in "-_ ").strip()
+    save_path = SAVES_DIR / f"{safe_name}.json"
+
+    if save_path.exists():
+        save_path.unlink()
+        log.info(f"Deleted save: {safe_name}")
+        return {"status": "ok", "deleted": safe_name}
+    return {"status": "error", "message": f"Save '{safe_name}' not found"}
+
 
 class UserConfig(BaseModel):
     hf_token: Optional[str] = None
