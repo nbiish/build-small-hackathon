@@ -53,18 +53,28 @@ PROJECT_COOLDOWN_OVERRIDES = {
 
 # Max tokens to request (keeps costs bounded)
 MAX_NEW_TOKENS = int(os.environ.get("INFERENCE_MAX_TOKENS", "220"))
+
+
 # ── Cooldown registry ────────────────────────────────────────────────────────
 @dataclass
 class _CooldownState:
     last_call: float = 0.0
     lock: threading.Lock = field(default_factory=threading.Lock)
+
+
 _states: Dict[str, _CooldownState] = {}
+
+
 def _state(project: str) -> _CooldownState:
     if project not in _states:
         _states[project] = _CooldownState()
     return _states[project]
+
+
 def cooldown_seconds_for(project: str) -> float:
     return PROJECT_COOLDOWN_OVERRIDES.get(project, COOLDOWN_SECONDS)
+
+
 def cooldown_active(project: str) -> bool:
     """Return True if the project is currently in cooldown (cannot run inference)."""
     state = _state(project)
@@ -72,12 +82,16 @@ def cooldown_active(project: str) -> bool:
     if now - state.last_call < cooldown_seconds_for(project):
         return True
     return False
+
+
 def cooldown_remaining(project: str) -> float:
     """Seconds left in the cooldown window (0 if not in cooldown)."""
     state = _state(project)
     elapsed = time.time() - state.last_call
     remaining = cooldown_seconds_for(project) - elapsed
     return max(0.0, remaining)
+
+
 def cooldown_status(project: str) -> dict:
     """Snapshot of cooldown state for the UI."""
     return {
@@ -85,10 +99,14 @@ def cooldown_status(project: str) -> dict:
         "remaining_seconds": round(cooldown_remaining(project), 2),
         "window_seconds": cooldown_seconds_for(project),
     }
+
+
 def _mark_called(project: str) -> None:
     state = _state(project)
     with state.lock:
         state.last_call = time.time()
+
+
 # ── Inference client wrapper ─────────────────────────────────────────────────
 class InferenceResult:
     """A small wrapper so callers don't need to know which API returned text."""
@@ -100,14 +118,18 @@ class InferenceResult:
 
     def __repr__(self) -> str:
         return f"InferenceResult(text={self.text[:50]!r}…, model={self.model!r}, latency={self.latency_s:.2f}s)"
+
+
 def _get_client():
     """Lazy-load the InferenceClient to keep boot fast."""
     from huggingface_hub import InferenceClient
     return InferenceClient(
         model=INFERENCE_MODEL,
-        token=HF_TOKEN,  # provider kwarg removed for hf-inference default
-        
+        token=HF_TOKEN,
+        provider=INFERENCE_PROVIDER,
     )
+
+
 def generate(
     project: str,
     messages: List[Dict[str, str]],
@@ -143,12 +165,16 @@ def generate(
     return InferenceResult(
         text=text,
         model=INFERENCE_MODEL,
-        
+        provider=INFERENCE_PROVIDER,
         latency_s=latency,
     )
+
+
 def force_clear_cooldown(project: str) -> None:
     """Manual escape hatch (e.g. for testing or admin overrides)."""
     _state(project).last_call = 0.0
+
+
 # ── Convenience: build messages + format result ──────────────────────────────
 def chat_messages(system: str, user: str, history: Optional[List[Dict[str, str]]] = None) -> List[Dict[str, str]]:
     """Build an OpenAI-style message list with optional prior turns.
@@ -160,6 +186,8 @@ def chat_messages(system: str, user: str, history: Optional[List[Dict[str, str]]
         msgs.extend(history)
     msgs.append({"role": "user", "content": user})
     return msgs
+
+
 __all__ = [
     "InferenceResult",
     "cooldown_active",
@@ -173,6 +201,8 @@ __all__ = [
     "INFERENCE_PROVIDER",
     "MAX_NEW_TOKENS",
 ]
+
+
 if __name__ == "__main__":
     # Smoke test
     for p in ("tinybard", "focusfriend", "crittercalm"):

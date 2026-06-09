@@ -516,6 +516,7 @@ fastapi_app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="stati
 gradio_blocks = create_gradio_app()
 mount_gradio_app(fastapi_app, gradio_blocks, path="/gradio")
 
-# Export app for HF Spaces Gradio SDK / uvicorn
+# ---------------------------------------------------------------------------
+# Exported for HF Spaces Gradio SDK (launches once on import)
+# ---------------------------------------------------------------------------
 app = fastapi_app
-
