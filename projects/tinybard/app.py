@@ -516,14 +516,6 @@ fastapi_app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="stati
 gradio_blocks = create_gradio_app()
 mount_gradio_app(fastapi_app, gradio_blocks, path="/gradio")
 
-# ---------------------------------------------------------------------------
-# Entrypoint
-# ---------------------------------------------------------------------------
-if __name__ == "__main__":
-    import uvicorn
-    port = int(os.environ.get("PORT", "7860"))
-    log.info(f"Starting TinyBard on port {port}")
-    log.info(f"Frontend: http://localhost:{port}/")
-    log.info(f"Gradio API: http://localhost:{port}/gradio/")
-    log.info(f"MCP schema: http://localhost:{port}/gradio/gradio_api/mcp/schema")
-    uvicorn.run(fastapi_app, host="0.0.0.0", port=port)
+# Export app for HF Spaces Gradio SDK / uvicorn
+app = fastapi_app
+
