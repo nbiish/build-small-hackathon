@@ -1,6 +1,5 @@
 ---
 title: ᐴ FocusFriend ᔔ
-emoji: ☼
 colorFrom: indigo
 colorTo: yellow
 sdk: gradio
@@ -20,6 +19,8 @@ tags:
   - tiny-titan
   - anishinaabe
   - solarpunk
+  - inference-api
+  - cooldowns
 ---
 
 # ◈──◆──◇ ᐴ FOCUSFRIEND ᔔ PIP, YOUR CEDAR-AND-SUN COMPANION ON THE LAKE ◇──◆──◈
@@ -44,8 +45,8 @@ therapy and wants you to actually feel better, not just hear platitudes."
 ## ☼ NITAM-AABAJICHIGANAN / PREREQUISITES ◈
 
 - Python 3.10+
-- ~7.7GB disk for GGUF model
-- ~12GB RAM (CPU inference) or Metal/CUDA for GPU
+- A Hugging Face token (anonymous works for many small models)
+- ~100MB disk, ~256MB RAM — inference is serverless
 
 ## ☼ AABAJITOOWINAN / INSTALLATION ◈
 
@@ -54,10 +55,14 @@ git clone https://github.com/nbiish/focusfriend.git
 cd focusfriend
 pip install -r requirements.txt
 
-# Download Gemma 4 12B GGUF model
-huggingface-cli download unsloth/gemma-4-12b-it-GGUF \
-  --include "gemma-4-12b-it-Q4_K_M.gguf" \
-  --local-dir ./models
+# Optional: pick a model (default: Qwen/Qwen2.5-7B-Instruct)
+export INFERENCE_MODEL="Qwen/Qwen2.5-7B-Instruct"
+
+# Optional: set the HF token
+export HF_TOKEN="hf_..."
+
+# Optional: tune the cooldown
+export FOCUSFRIEND_COOLDOWN_SECONDS=10
 
 python app.py
 ```
@@ -66,9 +71,11 @@ Then open <http://localhost:7862/>.
 
 ## ☼ ZHOONIYAAWICHIGEWIN / MODEL ◈
 
-| Model | Size | Purpose | License |
-|-------|------|---------|---------|
-| Gemma 4 12B (Q4_K_M) | 12B params, ~7.7GB | Conversational AI + wellness guidance | Apache 2.0 (Gemma) |
+| Model (default) | Size | Purpose | License |
+|---|---|---|---|
+| Qwen2.5-7B-Instruct | 7B | Wellness companion chat | Apache 2.0 |
+| Meta-Llama-3-8B-Instruct | 8B | Alternative | Llama 3 Community |
+| gemma-2-9b-it | 9B | Alternative | Gemma License |
 
 ## ☼ MCP KINOOMAAGEWINAN / MCP TOOLS ◈
 
@@ -83,9 +90,10 @@ Runs with `mcp_server=True` — Streamable HTTP MCP server at `/gradio/gradio_ap
 ## ☼ GIIZHIITAA / BADGES ◈
 
 - 🎨  **Off-Brand** — Anishinaabe-Solarpunk CSS theme with sun-amber gradients
-- 🔌  **Off the Grid** — Fully local, no API calls
 - 📓  **Field Notes** — Blog post about AI wellness companions
-- 🦙  **Tiny Titan** — Model option ≤4B available
+- 🦙  **Tiny Titan** — Default model is 7B; can switch to 1.5B Qwen for true Tiny Titan
+- 🌀  **Cooldowns** — Serverless inference with built-in credit protection
+- ☁  **HF Inference API** — Uses Hugging Face serverless backend (no local GGUF build)
 
 ## ☼ GANAWAABANDAAN / MEET PIP ◈
 

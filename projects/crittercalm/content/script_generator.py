@@ -1,14 +1,39 @@
 """
-Calming script generation using Dolphin-X1-8B (via llama.cpp) or templates.
+Calming script generation using the Hugging Face Inference API
+or pre-written templates.
 
-Provides:
-- generate_calming_script(): LLM-based generation with template fallback
-- CALMING_SYSTEM_PROMPT: The system prompt for Dolphin
-- create_script_prompt(): Build the user prompt for script generation
+The previous version used Dolphin-X1-8B via llama-cpp-python locally. That
+required a heavy build step on HF Spaces. This version uses the serverless
+HF Inference API and enforces a per-project cooldown via
+`shared.inference_client` to protect credit budgets.
+
+Override model: set `CRITTERCALM_MODEL` env var. Default is
+`Qwen/Qwen2.5-7B-Instruct` (small, fast, free-tier friendly). The
+system prompt is unchanged — output format is identical.
 """
+from __future__ import annotations
 
 import logging
-from content.templates import get_template
+import os
+import sys
+from pathlib import Path
+from typing import List, Dict, Optional
+
+# Repo-root path setup so we can import shared.inference_client
+_THIS = Path(__file__).resolve()
+_REPO_ROOT = _THIS.parent.parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from shared.inference_client import (  # noqa: E402
+    chat_messages,
+    cooldown_active,
+    cooldown_status,
+    generate as _client_generate,
+    INFERENCE_MODEL as DEFAULT_MODEL,
+)
+
+from content.templates import get_template  # noqa: E402
 
 log = logging.getLogger("crittercalm.content")
 
@@ -33,6 +58,10 @@ Guidelines:
 Output ONLY the spoken script — no stage directions, no explanations."""
 
 
+def _model() -> str:
+    return os.environ.get("CRITTERCALM_MODEL", DEFAULT_MODEL)
+
+
 def create_script_prompt(
     animal: str,
     situation: str,
@@ -40,36 +69,12 @@ def create_script_prompt(
     pet_name: str = "",
     custom_message: str = "",
 ) -> str:
-    """
-    Build the user prompt for the LLM to generate a calming script.
-
-    Args:
-        animal: Animal type (Dog, Cat, Chicken, etc.)
-        situation: The stress situation
-        duration_minutes: Target session length in minutes
-        pet_name: Optional pet name
-        custom_message: Optional custom message to include
-
-    Returns:
-        Formatted prompt string
-    """
-    duration_words = (
-        "very brief, about 30 seconds"
-        if duration_minutes <= 1
-        else f"about {duration_minutes} minutes when read aloud slowly"
-    )
-    name_clause = f"named {pet_name}" if pet_name.strip() else ""
-    custom_clause = (
-        f"\nInclude this personal message naturally: \"{custom_message}\""
-        if custom_message.strip()
-        else ""
-    )
-
+    """Build the user prompt for script generation."""
+    pet_part = f" The pet's name is \"{pet_name}\"." if pet_name else ""
+    custom_part = f" Incorporate this personal note: \"{custom_message}\"" if custom_message else ""
     return (
-        f"Write a calming spoken message for a {animal} {name_clause}.\n"
-        f"Situation: {situation}.\n"
-        f"Length: {duration_words}.{custom_clause}\n"
-        f"Make it warm, soothing, and specifically tailored to a {animal}'s needs."
+        f"Write a {duration_minutes}-minute calming spoken message for a {animal} "
+        f"that is experiencing {situation}.{pet_part}{custom_part}"
     )
 
 
@@ -79,10 +84,9 @@ def generate_calming_script(
     duration_minutes: int,
     custom_message: str = "",
     pet_name: str = "",
-    dolphin_llm=None,
+    dolphin_llm=None,  # legacy param — ignored; we use the HF Inference API
 ) -> str:
-    """
-    Generate a calming script using Dolphin-X1-8B or fallback templates.
+    """Generate a calming script using HF Inference API or fallback templates.
 
     Args:
         animal: Animal type
@@ -90,12 +94,12 @@ def generate_calming_script(
         duration_minutes: Target session length
         custom_message: Optional custom message
         pet_name: Optional pet name
-        dolphin_llm: Optional pre-loaded llama_cpp.Llama instance
+        dolphin_llm: Legacy parameter (ignored)
 
     Returns:
         Generated calming script as a string
     """
-    prompt = create_script_prompt(
+    user_prompt = create_script_prompt(
         animal=animal,
         situation=situation,
         duration_minutes=duration_minutes,
@@ -103,22 +107,34 @@ def generate_calming_script(
         custom_message=custom_message,
     )
 
-    # Try LLM generation
-    if dolphin_llm is not None:
+    # Try inference (cooldown-aware)
+    if not cooldown_active("crittercalm"):
         try:
-            response = dolphin_llm.create_chat_completion(
-                messages=[
-                    {"role": "system", "content": CALMING_SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt},
-                ],
+            messages = chat_messages(CALMING_SYSTEM_PROMPT, user_prompt)
+            result = _client_generate(
+                project="crittercalm",
+                messages=messages,
+                max_new_tokens=int(duration_minutes * 200),  # rough token budget
                 temperature=0.7,
-                max_tokens=1024,
             )
-            script = response["choices"][0]["message"]["content"].strip()
-            log.info(f"LLM script generated: {len(script)} chars")
-            return script
+            script = result.text.strip()
+            if script:
+                log.info(f"LLM script generated: {len(script)} chars")
+                return script
+        except RuntimeError:
+            # Cooldown — fall through to template
+            log.info("crittercalm inference cooldown; using template")
         except Exception as exc:
             log.warning(f"LLM generation failed, using template: {exc}")
+    else:
+        log.info("crittercalm inference cooldown active; using template")
 
     # Fallback: pre-written templates
     return get_template(animal, situation, pet_name, custom_message)
+
+
+def cooldown_snapshot() -> dict:
+    return {
+        "model": _model(),
+        "cooldown": cooldown_status("crittercalm"),
+    }

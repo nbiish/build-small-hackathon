@@ -1,6 +1,6 @@
 ---
 title: ᐴ TinyBard ᔔ
-emoji: ☼
+emoji: ☀️
 colorFrom: blue
 colorTo: yellow
 sdk: gradio
@@ -11,25 +11,24 @@ license: apache-2.0
 tags:
   - text-adventure
   - interactive-fiction
-  - llama-cpp
   - thousand-token-wood
   - build-small-hackathon
   - tiny-titan
-  - llama-champion
   - off-brand
-  - off-the-grid
   - mcp-server
   - anishinaabe
   - solarpunk
+  - inference-api
+  - cooldowns
 ---
 
 # ◈──◆──◇ ᐴ TINYBARD ᔔ AADIZOOKAAN-AKINOOMAAGEWIN / STORY-TELLING ENGINE ◇──◆──◈
 
-> **A ≤4B LLM fires five-minute interactive text adventures in a cedar-and-copper CRT terminal.**
+> **A small LLM fires five-minute interactive text adventures in a cedar-and-copper CRT terminal.**
 >
 > ᐴ The land remembers the stories. ᔔ  ☼ ☘ ≈
 
-TinyBard uses FastAPI + `mount_gradio_app` (Gradio 6.0) with a fully custom HTML/CSS/JS frontend and **MCP server mode** enabled. Every adventure is procedurally generated — rooms, NPCs, items, and branching narratives on the fly.
+TinyBard uses FastAPI + `mount_gradio_app` (Gradio 6.0) with a fully custom HTML/CSS/JS frontend, **MCP server mode** enabled, and an **HF Inference API** backend. Every adventure is procedurally generated — rooms, NPCs, items, and branching narratives on the fly.
 
 ## ◆ GASHKITOONAN / CAPABILITIES ◈
 
@@ -37,15 +36,16 @@ TinyBard uses FastAPI + `mount_gradio_app` (Gradio 6.0) with a fully custom HTML
 - **◇ Three Aadizookaanan / Genres ◇** — Aadizookaan (Fantasy), Ish piming (Sci-Fi), Mashkodewaazibi (Cyberpunk)
 - **◇ Misko-Aki / CRT Terminal ◇** — Cedar-copper cabinet, sun-amber phosphor, frost-on-glass scanlines
 - **◇ MCP Kinoomaagewinan / Tools ◇** — `start_game` and `make_choice` exposed as MCP tools
-- **◇ Zhooniyaa / 100% Local ◇** — No cloud APIs. Runs on llama.cpp with GGUF quantized models
-- **◇ Bmaad-ziibi / Procedural Fallback ◇** — Full engine works without the LLM model loaded
-- **◇ Anishinaabe-Solarpunk ◇** — Sky-to-sunrise palette, Anishinaabe syllabic framings, biophilic motifs
+- **◇ Giiwenaabik / Inference API ◇** — Serverless HF Inference API; no local GGUF, no build step
+- **◇ Asabiikesiwin / Cooldown ◇** — 6s default between inference calls to protect your credit budget
+- **◇ Bmaad-ziibi / Procedural Fallback ◇** — Full engine works without the LLM
+- **◇ Anishinaabe-Solarpunk ◇** — Sky-to-sunrise palette, syllabic framings, biophilic motifs
 
 ## ☼ NITAM-AABAJICHIGANAN / PREREQUISITES ◈
 
 - Python 3.10+
-- ~1GB disk for GGUF model
-- ~2GB RAM (CPU inference) or Metal/CUDA for GPU
+- A Hugging Face token (for the Inference API; many small models work anonymously)
+- ~100MB disk, ~256MB RAM — the model is serverless, not local
 
 ## ◇ AABAJITOOWINAN / INSTALLATION ◈
 
@@ -54,12 +54,16 @@ git clone https://github.com/nbiish/tinybard.git
 cd tinybard
 pip install -r requirements.txt
 
-# Download model (Q8_0 quant, ~1.6GB)
-huggingface-cli download mradermacher/VibeThinker-1.5B-GGUF \
-  --include "VibeThinker-1.5B.Q8_0.gguf" \
-  --local-dir ./models
+# Optional: pick a model (default: Qwen/Qwen2.5-1.5B-Instruct — small + fast + free)
+export INFERENCE_MODEL="Qwen/Qwen2.5-1.5B-Instruct"
+# Or for the originally-intended VibeThinker 1.5B:
+# export INFERENCE_MODEL="mradermacher/VibeThinker-1.5B-GGUF"
 
-export TINYBARD_MODEL_PATH=./models/VibeThinker-1.5B.Q8_0.gguf
+# Optional: set the HF token (anonymous works for many models)
+export HF_TOKEN="hf_..."
+
+# Optional: tune the cooldown
+export TINYBARD_COOLDOWN_SECONDS=6
 
 python app.py
 ```
@@ -82,42 +86,58 @@ hum with a faint violet energy...
 ## ☼ NAANAAGADAWENINDIZOWIN / VERIFICATION ◈
 
 ```bash
-curl -X POST http://localhost:7860/gradio/gradio_api/call/start_game \
+curl -X POST http://localhost:7860/api/game/start \
   -H "Content-Type: application/json" \
-  -d '{"data":["fantasy"]}'
+  -d '{"genre": "fantasy"}'
 ```
 
-Returns SSE event stream with `story`, `choices`, `health`, `step`, `game_over`, `history_json`.
+Returns clean JSON: `{"story", "choices", "health", "step", "game_over", "history"}`.
+
+```bash
+curl http://localhost:7860/api/model_status
+```
+
+Returns: `{"model": "...", "cooldown": {"active": bool, "remaining_seconds": float, "window_seconds": float}}`.
 
 ## ◈ MODEL ◇
 
-| Model | Size | Purpose | License |
-|-------|------|---------|---------|
-| VibeThinker 1.5B (Q8_0) | 1.5B params, ~1.6GB | Interactive story generation | Apache 2.0 |
+| Model (default) | Size | Purpose | License |
+|---|---|---|---|
+| Qwen2.5-1.5B-Instruct | 1.5B | Interactive story generation | Apache 2.0 |
+| VibeThinker 1.5B | 1.5B | Alternative — also tiny | Apache 2.0 |
 
-Fits the **Tiny Titan** badge (≤4B params). Runs on any laptop.
+Override `INFERENCE_MODEL` to any model that supports `chat_completion` on the HF Inference API. The 1.5B defaults fit the **Tiny Titan** badge.
 
 ## ◇ MCP KINOOMAAGEWINAN / TOOLS ◈
 
-TinyBard runs with `mcp_server=True`, exposing these tools:
+TinyBard runs with `mcp_server=True`, exposing these tools (also available as FastAPI endpoints):
 
-- **`start_game(genre: str)`** — Start a new adventure. Genre: `fantasy` / `scifi` / `cyberpunk`
-- **`make_choice(choice, genre, step, health, history_json)`** — Submit a player choice to advance the story
+- **`/api/game/start`** (POST `{"genre": "fantasy|scifi|cyberpunk"}`) — Start an adventure
+- **`/api/game/choice`** (POST `{choice, genre, step, health, history}`) — Submit a player choice
+- **`/api/model_status`** (GET) — Check the inference model + cooldown state
 
 Connect from any MCP client (Claude Desktop, Cursor, etc.) to the SSE endpoint at `/gradio/gradio_api/mcp/`.
 
-## ◈ GIIZHIITAA / BADGE TARGETS ◇
+## ◇ GIIZHIITAA / BADGE TARGETS ◇
 
-- **◆ Llama Champion** — Uses llama.cpp runtime
-- **◆ Tiny Titan** — Model is 1.5B (well under 4B limit)
+- **◆ Tiny Titan** — Model ≤ 1.5B (well under 4B limit)
 - **◆ Off-Brand** — Fully custom FastAPI+Gradio frontend
-- **◆ Off the Grid** — Fully local, no API calls
 - **◆ Field Notes** — Blog post about tiny model interactive fiction
 
 ## ☼ GANAWENDAAGWAD / SECURITY ◈
 
-PQC standard for any future API keys via the `pqc-secrets` skill (ML-KEM-768 + AES-256-GCM). At present, the model is loaded from local GGUF — no key material in flight.
+PQC standard for any future API keys via the `pqc-secrets` skill (ML-KEM-768 + AES-256-GCM). At present, only the HF token is in flight (read from env var, never written to disk).
+
+## ◇ AABAAJICHIGANAN / COOLDOWNS ◈
+
+The `shared/inference_client.py` module enforces per-project cooldowns. Cooldown protects your HF/Modal credit budget from runaway re-rolls. Defaults:
+
+- `tinybard`: 6s
+- `focusfriend`: 10s
+- `crittercalm`: 12s
+
+Override per project via Space env vars (`TINYBARD_COOLDOWN_SECONDS`, etc.).
 
 ---
 
-◈──◆──◇ ☼ TinyBard v1.0 · Cedar Edition · Anishinaabe Solarpunk ◇──◆──◈
+◈──◆──◇ ☼ TinyBard v1.1 · Cedar Edition · Anishinaabe Solarpunk · Inference API ◇──◆──◈

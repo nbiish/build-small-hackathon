@@ -36,18 +36,26 @@ async function checkModelStatus() {
     try {
         const resp = await fetch(`${GRADIO_CLIENT_URL}/api/model_status`);
         if (!resp.ok) return;
-        const status = await resp.json();
-        if (status.available) {
-            modelStatus.textContent = "☘ MODEL: MII-GIIWETA / READY";
+        const s = await resp.json();
+        const model = s.model || "inference";
+        const cd = s.cooldown || { active: false, remaining_seconds: 0, window_seconds: 0 };
+        if (cd.active) {
+            modelStatus.textContent = `☘ ${model} / COOLDOWN ${cd.remaining_seconds.toFixed(1)}s`;
+            modelStatus.style.color = "var(--asp-ember)";
+        } else if (model) {
+            modelStatus.textContent = `☘ ${model} / READY`;
             modelStatus.style.color = "var(--asp-sun)";
         } else {
-            modelStatus.textContent = "☘ MODEL: GIIZHIK-WIIKI / FALLBACK";
+            modelStatus.textContent = "☘ NO MODEL / FALLBACK";
             modelStatus.style.color = "var(--asp-frost)";
         }
     } catch {
         modelStatus.textContent = "☘ MODEL: ?";
     }
 }
+
+// Poll model status every 2s so cooldown countdown updates
+setInterval(checkModelStatus, 2000);
 async function apiCall(endpoint, payload) {
     // Use the FastAPI clean-JSON endpoints (returns a dict directly).
     // /api/game/start  -> start_game
