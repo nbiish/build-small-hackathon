@@ -19,7 +19,7 @@ import random
 import logging
 import sys
 from pathlib import Path
-from typing import Optional, Dict, List
+from typing import Dict, List
 
 import gradio as gr
 from fastapi import FastAPI
