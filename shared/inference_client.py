@@ -100,22 +100,17 @@ class InferenceResult:
 
     def __repr__(self) -> str:
         return f"InferenceResult(text={self.text[:50]!r}…, model={self.model!r}, latency={self.latency_s:.2f}s)"
-def _get_client():
-    """Lazy-load the InferenceClient to keep boot fast."""
-    from huggingface_hub import InferenceClient
-    # By passing the model-specific serverless endpoint as base_url and omitting the model param,
-    # we force huggingface_hub to use the free serverless API instead of the paid router.huggingface.co.
-    model_endpoint = f"https://api-inference.huggingface.co/models/{INFERENCE_MODEL}"
-    return InferenceClient(
-        base_url=model_endpoint,
-        token=HF_TOKEN,
-    )
+# We use direct HTTP requests via httpx to bypass huggingface_hub library routing bugs
+# and force the use of the free serverless Inference API.
+import httpx
 def generate(
     project: str,
     messages: List[Dict[str, str]],
     *,
     max_new_tokens: Optional[int] = None,
     temperature: float = 0.7,
+    token: Optional[str] = None,
+    model: Optional[str] = None,
 ) -> InferenceResult:
     """Run a chat-style inference call, with cooldown enforcement.
 
@@ -131,20 +126,59 @@ def generate(
         )
 
     max_new_tokens = max_new_tokens or MAX_NEW_TOKENS
-    client = _get_client()
     start = time.time()
-    response = client.chat_completion(
-        messages=messages,
-        max_tokens=max_new_tokens,
-        temperature=temperature,
-    )
+    
+    # Format messages list into a plain text dialogue prompt
+    prompt = ""
+    for msg in messages:
+        role = msg.get("role", "user")
+        content_text = msg.get("content", "").strip()
+        if role == "system":
+            prompt += f"System Instructions:\n{content_text}\n\n"
+        elif role == "user":
+            prompt += f"User:\n{content_text}\n\n"
+        elif role == "assistant":
+            prompt += f"Assistant:\n{content_text}\n\n"
+    prompt += "Assistant:\n"
+
+    # Use overrides if provided
+    use_model = model or INFERENCE_MODEL
+    use_token = token or HF_TOKEN
+
+    # Call direct HF serverless Inference API
+    url = f"https://huggingface.co/api/models/{use_model}"
+    headers = {}
+    if use_token:
+        headers["Authorization"] = f"Bearer {use_token}"
+    
+    payload = {
+        "inputs": prompt,
+        "parameters": {
+            "max_new_tokens": max_new_tokens,
+            "temperature": temperature,
+            "return_full_text": False,
+        }
+    }
+    
+    resp = httpx.post(url, json=payload, headers=headers, timeout=30.0)
+    if resp.status_code != 200:
+        raise RuntimeError(f"HF Inference API Error {resp.status_code}: {resp.text}")
+        
+    data = resp.json()
+    # Direct model endpoint returns a list of completions
+    if isinstance(data, list) and len(data) > 0:
+        text = data[0].get("generated_text", "")
+    elif isinstance(data, dict):
+        text = data.get("generated_text", "")
+    else:
+        text = str(data)
+        
     latency = time.time() - start
-    text = response.choices[0].message.content or ""
     text = text.strip()
     _mark_called(project)
     return InferenceResult(
         text=text,
-        model=INFERENCE_MODEL,
+        model=use_model,
         provider=INFERENCE_PROVIDER,
         latency_s=latency,
     )
