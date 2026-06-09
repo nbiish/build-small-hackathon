@@ -19,9 +19,7 @@ import random
 import logging
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional
-import threading
-from pydantic import BaseModel
+from typing import Optional, Dict, List
 
 import gradio as gr
 from fastapi import FastAPI
@@ -60,26 +58,6 @@ STATIC_DIR = BASE_DIR / "static"
 TINYBARD_MODEL = os.environ.get("TINYBARD_MODEL", INFERENCE_MODEL)
 
 # ---------------------------------------------------------------------------
-# User-configurable inference (BYO token / model)
-# ---------------------------------------------------------------------------
-_USER_CONFIG_LOCK = threading.Lock()
-_USER_CONFIG: Dict[str, Optional[str]] = {
-    "hf_token": None,
-    "model": None,
-}
-
-
-def get_user_hf_token() -> Optional[str]:
-    with _USER_CONFIG_LOCK:
-        return _USER_CONFIG["hf_token"]
-
-
-def get_user_model() -> Optional[str]:
-    with _USER_CONFIG_LOCK:
-        return _USER_CONFIG["model"]
-
-
-# ---------------------------------------------------------------------------
 # Llama.cpp Inference Setup
 # ---------------------------------------------------------------------------
 # No local LLM state — every inference call goes through the HF Inference API
@@ -90,18 +68,17 @@ def llm_available() -> bool:
     """True if we *might* succeed at an inference call (cooldown not active,
     HF_TOKEN configured, model id is set)."""
     import os
-    token = get_user_hf_token() or os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACEHUB_API_TOKEN")
-    model = get_user_model() or TINYBARD_MODEL
-    # Inference API still works anonymously for some models, so don't gate hard.
-    return bool(model) and not cooldown_active("tinybard")
+    if not os.environ.get("HF_TOKEN") and not os.environ.get("HUGGINGFACEHUB_API_TOKEN"):
+        # Inference API still works anonymously for some models, so don't gate hard.
+        pass
+    return bool(TINYBARD_MODEL) and not cooldown_active("tinybard")
 
 
 def last_inference_status() -> dict:
     """Snapshot of the current cooldown + model for /api/model_status."""
     return {
-        "model": get_user_model() or TINYBARD_MODEL,
+        "model": TINYBARD_MODEL,
         "cooldown": cooldown_status("tinybard"),
-        "has_user_token": bool(get_user_hf_token()),
     }
 
 
@@ -179,8 +156,7 @@ def generate_procedural_step(genre: str, step: int, health: int, choice: str = "
             "choices": genre_data["nodes"][0]["choices"],
             "health": health,
             "step": 1,
-            "game_over": False,
-            "genre": genre,
+            "game_over": False
         }
 
     health_delta = random.choice([-15, 0, 10])
@@ -192,8 +168,16 @@ def generate_procedural_step(genre: str, step: int, health: int, choice: str = "
             "choices": [],
             "health": 0,
             "step": step + 1,
-            "game_over": True,
-            "genre": genre,
+            "game_over": True
+        }
+
+    if step >= 4:
+        return {
+            "story": f"After choosing: '{choice}'. " + genre_data["win"],
+            "choices": [],
+            "health": new_health,
+            "step": step + 1,
+            "game_over": True
         }
 
     node = genre_data["nodes"][step % len(genre_data["nodes"])]
@@ -202,8 +186,7 @@ def generate_procedural_step(genre: str, step: int, health: int, choice: str = "
         "choices": node["choices"],
         "health": new_health,
         "step": step + 1,
-        "game_over": False,
-        "genre": genre,
+        "game_over": False
     }
 
 
@@ -349,7 +332,14 @@ def create_gradio_app() -> gr.Blocks:
                     [], 0, step + 1, True, json.dumps(history)
                 )
 
-            # No step cap — adventure continues infinitely until health reaches 0
+            if step >= 4:
+                instruction = "Narrate the final glorious victory. The adventure ends in success."
+                story = generate_llm_story(genre, history, instruction)
+                return (
+                    story or "You have achieved your goal! You are victorious!",
+                    [], new_health, step + 1, True, json.dumps(history)
+                )
+
             instruction = "Narrate what happens next as a result of the player's choice."
             story = generate_llm_story(genre, history, instruction)
             if not story:
@@ -447,7 +437,6 @@ def _run_turn(choice: str, genre: str, step: int, health: int, history: List[Dic
         return {
             "story": story, "choices": choices[:3], "health": 100,
             "step": 1, "game_over": False, "history": history,
-            "genre": genre,
         }
 
     # Subsequent turn
@@ -464,7 +453,16 @@ def _run_turn(choice: str, genre: str, step: int, health: int, history: List[Dic
         return {
             "story": story or "Your strength fails. The adventure ends in darkness.",
             "choices": [], "health": 0, "step": step + 1, "game_over": True,
-            "history": history, "genre": genre,
+            "history": history,
+        }
+
+    if step >= 4:
+        instruction = "Narrate the final glorious victory. The adventure ends in success."
+        story = generate_llm_story(genre, history, instruction)
+        return {
+            "story": story or "You have achieved your goal! You are victorious!",
+            "choices": [], "health": new_health, "step": step + 1, "game_over": True,
+            "history": history,
         }
 
     instruction = "Narrate what happens next as a result of the player's choice."
@@ -479,7 +477,6 @@ def _run_turn(choice: str, genre: str, step: int, health: int, history: List[Dic
     return {
         "story": story, "choices": choices[:3], "health": new_health,
         "step": step + 1, "game_over": False, "history": history,
-        "genre": genre,
     }
 
 
@@ -512,132 +509,6 @@ async def game_choice(payload: dict):
         history=payload.get("history", []),
     )
 
-# ---------------------------------------------------------------------------
-# Save/Load System
-# ---------------------------------------------------------------------------
-SAVES_DIR = BASE_DIR / "saves"
-SAVES_DIR.mkdir(exist_ok=True)
-
-
-@fastapi_app.post("/api/game/save")
-async def game_save(payload: dict):
-    """Save current game state to a named slot.
-
-    Body: {slot_name, genre, step, health, history, game_over}
-    """
-    slot_name = payload.get("slot_name", "autosave")
-    # Sanitize slot name for filesystem
-    safe_name = "".join(c for c in slot_name if c.isalnum() or c in "-_ ").strip()
-    if not safe_name:
-        safe_name = "autosave"
-
-    save_data = {
-        "slot_name": safe_name,
-        "genre": payload.get("genre", "fantasy"),
-        "step": int(payload.get("step", 0)),
-        "health": int(payload.get("health", 100)),
-        "history": payload.get("history", []),
-        "game_over": payload.get("game_over", False),
-        "timestamp": __import__("time").time(),
-    }
-
-    save_path = SAVES_DIR / f"{safe_name}.json"
-    save_path.write_text(json.dumps(save_data, indent=2))
-    log.info(f"Game saved to slot: {safe_name}")
-    return {"status": "ok", "slot_name": safe_name, "timestamp": save_data["timestamp"]}
-
-
-@fastapi_app.get("/api/game/saves")
-async def game_saves():
-    """List all saved games."""
-    saves = []
-    for f in sorted(SAVES_DIR.glob("*.json")):
-        try:
-            data = json.loads(f.read_text())
-            saves.append({
-                "slot_name": data.get("slot_name", f.stem),
-                "genre": data.get("genre", "unknown"),
-                "step": data.get("step", 0),
-                "health": data.get("health", 0),
-                "timestamp": data.get("timestamp", 0),
-                "game_over": data.get("game_over", False),
-            })
-        except Exception:
-            continue
-    return {"saves": saves}
-
-
-@fastapi_app.post("/api/game/load")
-async def game_load(payload: dict):
-    """Load a saved game by slot name.
-
-    Body: {slot_name}
-    """
-    slot_name = payload.get("slot_name", "")
-    safe_name = "".join(c for c in slot_name if c.isalnum() or c in "-_ ").strip()
-    save_path = SAVES_DIR / f"{safe_name}.json"
-
-    if not save_path.exists():
-        return {"status": "error", "message": f"Save '{safe_name}' not found"}
-
-    try:
-        data = json.loads(save_path.read_text())
-        return {
-            "status": "ok",
-            "slot_name": data.get("slot_name", safe_name),
-            "genre": data.get("genre", "fantasy"),
-            "step": data.get("step", 0),
-            "health": data.get("health", 100),
-            "history": data.get("history", []),
-            "game_over": data.get("game_over", False),
-        }
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-
-@fastapi_app.delete("/api/game/save/{slot_name}")
-async def game_delete_save(slot_name: str):
-    """Delete a saved game."""
-    safe_name = "".join(c for c in slot_name if c.isalnum() or c in "-_ ").strip()
-    save_path = SAVES_DIR / f"{safe_name}.json"
-
-    if save_path.exists():
-        save_path.unlink()
-        log.info(f"Deleted save: {safe_name}")
-        return {"status": "ok", "deleted": safe_name}
-    return {"status": "error", "message": f"Save '{safe_name}' not found"}
-
-
-class UserConfig(BaseModel):
-    hf_token: Optional[str] = None
-    model: Optional[str] = None
-
-
-@fastapi_app.post("/api/config")
-async def update_config(cfg: UserConfig):
-    with _USER_CONFIG_LOCK:
-        if cfg.hf_token:
-            _USER_CONFIG["hf_token"] = cfg.hf_token.strip() or None
-        if cfg.model and cfg.model.strip():
-            _USER_CONFIG["model"] = cfg.model.strip()
-        current = dict(_USER_CONFIG)
-    return {
-        "status": "ok",
-        "model": current["model"] or TINYBARD_MODEL,
-        "has_token": bool(current["hf_token"]),
-    }
-
-
-@fastapi_app.get("/api/config")
-async def get_config():
-    with _USER_CONFIG_LOCK:
-        current = dict(_USER_CONFIG)
-    return {
-        "model": current["model"] or TINYBARD_MODEL,
-        "has_token": bool(current["hf_token"]),
-    }
-
-
 # Mount static files
 fastapi_app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
@@ -646,6 +517,13 @@ gradio_blocks = create_gradio_app()
 mount_gradio_app(fastapi_app, gradio_blocks, path="/gradio")
 
 # ---------------------------------------------------------------------------
-# Exported for HF Spaces Gradio SDK (launches once on import)
+# Entrypoint
 # ---------------------------------------------------------------------------
-app = fastapi_app
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", "7860"))
+    log.info(f"Starting TinyBard on port {port}")
+    log.info(f"Frontend: http://localhost:{port}/")
+    log.info(f"Gradio API: http://localhost:{port}/gradio/")
+    log.info(f"MCP schema: http://localhost:{port}/gradio/gradio_api/mcp/schema")
+    uvicorn.run(fastapi_app, host="0.0.0.0", port=port)
