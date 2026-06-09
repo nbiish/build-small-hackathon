@@ -1,103 +1,72 @@
 """
-LLM inference wrapper for FocusFriend using llama.cpp + Gemma 4 12B.
+LLM inference wrapper for FocusFriend using the Hugging Face Inference API.
 
-Handles lazy loading, streaming, and fallback behavior.
+The previous version loaded a local GGUF (Gemma 4 12B Q4_K_M) via llama-cpp-python.
+That required a heavy compile step on HF Spaces and tied us to a single model. This
+version uses `huggingface_hub.InferenceClient` (serverless) and enforces a
+project-scoped cooldown via `shared.inference_client` to protect your credit budget.
+
+To override the model: set `INFERENCE_MODEL` env var.
+Common picks:
+- "Qwen/Qwen2.5-7B-Instruct" (default; sweet spot for chat)
+- "meta-llama/Meta-Llama-3-8B-Instruct"
+- "google/gemma-2-9b-it"
 """
+from __future__ import annotations
 
-import os
-import threading
 import logging
+import os
+import sys
+import threading
 from pathlib import Path
-from typing import Optional, Generator, List, Dict
+from typing import Generator, List, Dict, Optional
 
 log = logging.getLogger("focusfriend.inference")
 
-# Singleton
-_llm = None
-_llm_lock = threading.Lock()
+# Add monorepo root so we can import shared.inference_client
+_THIS = Path(__file__).resolve()
+_PROJECT = _THIS.parent.parent
+_REPO_ROOT = _PROJECT.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
-# Default model path
-DEFAULT_MODEL_DIR = Path(os.environ.get("FOCUSFRIEND_MODEL_DIR", Path(__file__).parent.parent / "models"))
-DEFAULT_MODEL_PATH = os.environ.get(
-    "GEMMA_MODEL_PATH",
-    str(DEFAULT_MODEL_DIR / "gemma-4-12b-it-Q4_K_M.gguf"),
+from shared.inference_client import (  # noqa: E402
+    InferenceResult,
+    chat_messages,
+    cooldown_status,
+    cooldown_active,
+    generate as _client_generate,
+    INFERENCE_MODEL as DEFAULT_MODEL,
 )
-DEFAULT_N_CTX = int(os.environ.get("GEMMA_N_CTX", "8192"))
-DEFAULT_N_THREADS = int(os.environ.get("GEMMA_N_THREADS", str(os.cpu_count() or 4)))
 
 
-def load_model(
-    model_path: str = None,
-    n_ctx: int = None,
-    n_threads: int = None,
-) -> Optional[object]:
-    """
-    Load the Gemma 4 12B GGUF model via llama.cpp.
-
-    Args:
-        model_path: Path to GGUF file. Uses env var / default if not provided.
-        n_ctx: Context window size. Default 8192.
-        n_threads: CPU threads. Default all cores.
-
-    Returns:
-        Llama instance or None if loading fails.
-    """
-    global _llm
-
-    if _llm is not None:
-        return _llm
-
-    with _llm_lock:
-        if _llm is not None:
-            return _llm
-
-        model_path = model_path or DEFAULT_MODEL_PATH
-        n_ctx = n_ctx or DEFAULT_N_CTX
-        n_threads = n_threads or DEFAULT_N_THREADS
-
-        gguf_path = Path(model_path)
-        if not gguf_path.exists():
-            log.warning(
-                f"Model not found at {gguf_path}. "
-                f"Download: huggingface-cli download unsloth/gemma-4-12b-it-GGUF "
-                f"--include 'gemma-4-12b-it-Q4_K_M.gguf' --local-dir {DEFAULT_MODEL_DIR}"
-            )
-            return None
-
-        try:
-            from llama_cpp import Llama
-
-            log.info(f"Loading Gemma 4 12B from {gguf_path}")
-            log.info(f"  n_ctx={n_ctx}, n_threads={n_threads}")
-
-            _llm = Llama(
-                model_path=str(gguf_path),
-                n_ctx=n_ctx,
-                n_threads=n_threads,
-                verbose=False,
-            )
-            log.info("Gemma 4 12B loaded successfully ✓")
-            return _llm
-
-        except ImportError:
-            log.warning("llama-cpp-python not installed. pip install llama-cpp-python")
-            return None
-        except Exception as exc:
-            log.error(f"Failed to load Gemma 4 12B: {exc}")
-            return None
-
-
-def get_model() -> Optional[object]:
-    """Get the current LLM instance (lazy-loads if needed)."""
-    global _llm
-    if _llm is not None:
-        return _llm
-    return load_model()
+def _model() -> str:
+    """Pick the FocusFriend-specific model, falling back to the default."""
+    return os.environ.get("FOCUSFRIEND_MODEL", DEFAULT_MODEL)
 
 
 def is_model_available() -> bool:
-    """Check if the LLM is loaded and ready."""
-    return _llm is not None
+    """True if the inference API is configured (token or anonymous)."""
+    if cooldown_active("focusfriend"):
+        return False
+    has_token = bool(os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACEHUB_API_TOKEN"))
+    # Many small models work anonymously; don't gate hard.
+    return bool(_model())
+
+
+def get_model() -> Optional[str]:
+    """Return the model id we plan to use. None if no model configured."""
+    if not _model():
+        return None
+    return _model()
+
+
+def cooldown_snapshot() -> dict:
+    """Public status snapshot for the UI."""
+    return {
+        "model": _model(),
+        "cooldown": cooldown_status("focusfriend"),
+    }
 
 
 def generate_response(
@@ -105,30 +74,24 @@ def generate_response(
     temperature: float = 0.8,
     max_tokens: int = 300,
 ) -> Optional[str]:
-    """
-    Generate a non-streaming response from the model.
+    """One-shot generation. Returns text or None on cooldown/failure.
 
-    Args:
-        messages: List of {'role': ..., 'content': ...} dicts
-        temperature: Generation temperature
-        max_tokens: Max output tokens
-
-    Returns:
-        Generated text or None on failure
+    `messages` follows OpenAI chat format. Caller is responsible for system prompt
+    and prior turns.
     """
-    model = get_model()
-    if model is None:
+    if cooldown_active("focusfriend"):
+        log.info("focusfriend inference skipped (cooldown active)")
         return None
-
     try:
-        response = model.create_chat_completion(
+        result = _client_generate(
+            project="focusfriend",
             messages=messages,
+            max_new_tokens=max_tokens,
             temperature=temperature,
-            max_tokens=max_tokens,
         )
-        return response["choices"][0]["message"]["content"]
+        return result.text
     except Exception as exc:
-        log.error(f"Generation error: {exc}")
+        log.warning(f"HF Inference error: {exc}")
         return None
 
 
@@ -137,42 +100,40 @@ def generate_stream(
     temperature: float = 0.8,
     max_tokens: int = 300,
 ) -> Generator[str, None, None]:
-    """
-    Generate a streaming response from the model.
+    """Streaming generator. Yields the full response in chunks.
 
-    Args:
-        messages: List of {'role': ..., 'content': ...} dicts
-        temperature: Generation temperature
-        max_tokens: Max output tokens
-
-    Yields:
-        Text chunks as they arrive
+    The HF Inference API doesn't return true token-level streams from chat_completion
+    in the python client, so we yield the full text and let the UI's natural
+    chunking handle the appearance of streaming. Falls back to graceful error.
     """
-    model = get_model()
-    if model is None:
-        yield "⚠️  Model not loaded. I'm running on fallback mode right now."
+    if cooldown_active("focusfriend"):
+        yield "\n\n⏳ Pip is resting. (Inference cooldown — try again in a moment.)"
         return
-
     try:
-        stream = model.create_chat_completion(
+        result = _client_generate(
+            project="focusfriend",
             messages=messages,
+            max_new_tokens=max_tokens,
             temperature=temperature,
-            max_tokens=max_tokens,
-            stream=True,
         )
-
-        for chunk in stream:
-            delta = chunk["choices"][0].get("delta", {})
-            content = delta.get("content", "")
-            if content:
-                yield content
-
+        # Simulate streaming by chunking the response on word boundaries
+        text = result.text
+        if not text:
+            yield "\n\n[No response]"
+            return
+        # Yield in word-sized chunks for natural reading pace
+        words = text.split(" ")
+        for i, word in enumerate(words):
+            chunk = word if i == 0 else " " + word
+            yield chunk
     except Exception as exc:
-        log.error(f"Streaming error: {exc}")
         yield f"\n\n⚠️  Something went wrong: {exc}"
 
 
 def unload_model():
-    """Release the model from memory."""
-    global _llm
-    _llm = None
+    """No-op for serverless inference (kept for API compat)."""
+    return
+
+
+# Re-export for callers that still expect this
+load_model = lambda *args, **kwargs: get_model()  # noqa: E731

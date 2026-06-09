@@ -13,8 +13,7 @@
 ## Overview
 
 - **Name:** Build Small Hackathon 2026 — Team nbiish
-- **Version:** 0.4.0 — Cedar-Copper Edition
-- **Description:** Multi-project hackathon entry targeting $48K+ prize pool across Backyard AI and Thousand Token Wood tracks. Three Gradio apps using small models (≤32B) with maximum bonus badge coverage.
+- **Version:** 0.5.0 — Cedar-Copper Edition (HF Inference API)
 - **Aesthetic:** Cedar-copper visual language — sky-to-sunrise palette (water-blue → cedar → copper → sun-amber → birch-cream), biophilic motifs, sky-to-water gradient banners. Shared CSS variables live in `shared/cedar_copper_tokens.py`.
 - **Purpose:** Win prizes across tracks, badges, and sponsor categories by building delightful, useful AI apps that run locally.
 - **UX:** Gradio web apps (gr.Blocks + mount_gradio_app custom frontends), hosted on HF Spaces.
@@ -73,20 +72,30 @@
 - HF README metadata: `colorTo` must be one of `[red, yellow, green, blue, indigo, purple, pink, gray]` (no `emerald`/`amber`).
 - HF README metadata: `emoji` must match `/\p{Extended_Pictographic}/u` — only the standard emoji block is allowed; decorative Unicode glyphs (solar/astrological/typographic symbols) fail validation. Use a real emoji.
 
+### Inference Architecture (v0.5+)
+
+- **All LLM inference** is now via the **Hugging Face Inference API** (serverless). No more local GGUF, no `llama-cpp-python` compile step.
+- Shared module: `shared/inference_client.py` provides `cooldown_status()`, `cooldown_active()`, `generate()`, and `chat_messages()`.
+- Default model: `Qwen/Qwen2.5-1.5B-Instruct` (free tier, fast, well-suited to chat). Override via `INFERENCE_MODEL`.
+- Per-project model override: `TINYBARD_MODEL`, `FOCUSFRIEND_MODEL`, `CRITTERCALM_MODEL`.
+- **Cooldowns** enforce a per-project minimum gap between inference calls (protects HF/Modal credit budget):
+  - `tinybard`: 6s
+  - `focusfriend`: 10s
+  - `crittercalm`: 12s
+  - Override via `TINYBARD_COOLDOWN_SECONDS`, etc., or global `INFERENCE_COOLDOWN_SECONDS`.
+- **Always-fallback:** every LLM call falls back to procedural / template output if inference fails or is in cooldown. No LLM call ever blocks the UX.
+- HF Spaces are the dev/test environment — iterate live at `huggingface.co/spaces/nbiish/{tinybard,focusfriend,crittercalm}` rather than localhost.
+
 ### Local Test Environment
 
 - Python: miniconda3 (Python 3.12)
 - Gradio: 6.0.0
-- llama-cpp-python: installed via conda-forge (v0.3.16)
-- Available GGUF models:
-  - VibeThinker-1.5B.Q8_0.gguf (in HF cache)
-  - LFM2-1.2B-Q4_K_M.gguf (in HF cache)
-  - LFM2-8B-A1B-Q4_K_M.gguf (in ggufy/models/)
-- Missing GGUF models (need download): Gemma 4 12B, Dolphin-X1-8B
+- `huggingface_hub` (for Inference API client)
+- Inference is serverless — no local model files needed unless you opt in to local mode
 
-### Local Servers
+### Local Servers (optional)
 
-All 3 apps run simultaneously on different ports for visual inspection:
+Local servers were used during v0.4 development for visual inspection. v0.5+ prefers iterating on the live HF Spaces (which use your HF/Modal compute credits). Local servers can still be run for dev:
 
 | Project | URL | Stack | HF Space |
 |---|---|---|---|
@@ -100,34 +109,27 @@ All 3 apps run simultaneously on different ports for visual inspection:
 
 ### 1. CritterCalm (Backyard AI)
 
-- **Status:** Code complete. Deployed. Locally tested. Cedar-copper UI applied.
-- **Stack:** OmniVoice (0.6B) + Dolphin-X1-8B (8B) + Kokoro TTS (82M) = 8.7B params
-- **Badges:** Off the Grid, Well-Tuned (TBD), Field Notes, Llama Champion (TBD), Off-Brand (custom banner)
+- **Status:** Code complete. Deployed. HF Inference API + cooldowns wired for script generation. OmniVoice voice cloning still requires local install.
+- **Stack:** OmniVoice (0.6B, local optional) + Kokoro TTS (82M, local optional) + Qwen2.5-7B (default) via HF Inference API
+- **Badges:** Off the Grid, Well-Tuned (TBD), Field Notes, Off-Brand
 - **GitHub:** github.com/nbiish/crittercalm
 - **HF Space:** huggingface.co/spaces/nbiish/crittercalm
 - **Standalone repo:** /Volumes/1tb-sandisk/code-external/crittercalm-repo
 
 ### 2. FocusFriend (Thousand Token Wood)
 
-- **Status:** Code complete. Deployed. Locally tested. Cedar-copper UI applied. Gradio 6 Chatbot dict-format fixed.
-- **Stack:** Gemma 4 12B (12B) via llama-cpp-python
-- **Badges:** Off-Brand (sun-amber custom theme), Off the Grid, Field Notes
+- **Status:** Code complete. Deployed. HF Inference API + cooldowns wired. Gradio 6 Chatbot dict-format fixed.
+- **Stack:** Qwen2.5-7B (default) via HF Inference API
+- **Badges:** Off-Brand (sun-amber custom theme), Field Notes, Cooldowns badge
 - **GitHub:** github.com/nbiish/focusfriend
 - **HF Space:** huggingface.co/spaces/nbiish/focusfriend
 - **Standalone repo:** /Volumes/1tb-sandisk/code-external/focusfriend-repo
-- **Note:** Gemma 4 12B GGUF not yet downloaded. Need `huggingface-cli download unsloth/gemma-4-12b-it-GGUF --include "gemma-4-12b-it-Q4_K_M.gguf" --local-dir ./models`
 
 ### 3. TinyBard (Thousand Token Wood + Tiny Titan + Llama Champion)
 
-- **Status:** Code complete. Deployed. Locally tested end-to-end (game loop). Cedar-copper CRT UI applied.
+- **Status:** Code complete. Deployed. HF Inference API + cooldowns wired. Local test verified (procedural fallback + cooldown UI).
 - **Concept:** ≤4B LLM generates 5-min interactive text adventures in a CRT terminal aesthetic.
-- **Stack:** VibeThinker 1.5B (1.5B) via llama-cpp-python + procedural fallback engine
-- **Architecture:** FastAPI + mount_gradio_app at /gradio. Custom HTML/CSS/JS frontend. MCP tools: start_game, make_choice.
-- **Badges:** Llama Champion, Tiny Titan (1.5B < 4B), Off-Brand (custom CRT), Off the Grid, Field Notes
-- **Prize targets:** Tiny Titan ($1K), Thousand Token Wood track, Bonus Quest Champion potential
-- **GitHub:** github.com/nbiish/tinybard
-- **HF Space:** huggingface.co/spaces/nbiish/tinybard
-- **Standalone repo:** /Volumes/1tb-sandisk/code-external/tinybard
+- **Stack:** Qwen2.5-1.5B (default) via HF Inference API + procedural fallback engine
 
 ---
 
@@ -155,17 +157,21 @@ All 3 apps run simultaneously on different ports for visual inspection:
 - [x] INTELLIGENCE.md — full hackathon landscape analysis
 - [x] SUBMISSION_DRAFTS.md — social posts + Field Notes drafts
 - [x] HF CLI installed + skills configured (`hf skills add --global`)
-- [x] llama-cpp-python installed (conda-forge v0.3.16)
+- [x] llama-cpp-python installed (conda-forge v0.3.16) — for reference; v0.5+ uses HF Inference API
 - [x] Local verification: all 3 apps run on ports 7861/7862/7863
 - [x] TinyBard end-to-end game loop verified (start → choose → next scene)
 - [x] FocusFriend chat verified (user message → Pip reply)
 - [x] CritterCalm UI navigation verified (all 3 tabs render)
+- [x] **v0.5: HF Inference API wired into all 3 apps** (no local GGUF, no build step)
+- [x] **v0.5: Cooldown system** in `shared/inference_client.py` to protect HF/Modal credit budget
+- [x] **v0.5: TinyBard local test** — procedural fallback works when no HF_TOKEN; cooldown UI shows in footer
 
 ---
 
 ## Short-term Goals
 
-- Test all 3 apps locally with real GGUF models (currently running with procedural fallbacks)
+- Iterate on the live HF Spaces (nbiish/tinybard, nbiish/focusfriend, nbiish/crittercalm)
+- Set HF_TOKEN + INFERENCE_MODEL Space secrets to enable real LLM-backed adventures
 - Record demo videos and post to social media
 - Write and publish Field Notes blog posts
 - Share agent traces for Sharing is Caring badge
@@ -179,6 +185,7 @@ All 3 apps run simultaneously on different ports for visual inspection:
 - FocusFriend: projects/focusfriend/ + github.com/nbiish/focusfriend
 - TinyBard: projects/tinybard/ + github.com/nbiish/tinybard
 - Aesthetic module: shared/cedar_copper_tokens.py
+- Inference client: shared/inference_client.py
 - ML Intern: github.com/huggingface/ml-intern
 - HF Agents CLI: huggingface.co/docs/hub/en/agents-cli
 - Gradio MCP: gradio.app/guides/model-context-protocol

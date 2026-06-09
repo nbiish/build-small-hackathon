@@ -19,6 +19,8 @@ tags:
   - off-the-grid
   - anishinaabe
   - solarpunk
+  - inference-api
+  - cooldowns
 ---
 
 # ◈──◆──◇ ᐴ CRITTERCALM ᔔ MAANAMEWIN / VOICE-COMFORT FOR THE FOUR-LEGGEDS ◇──◆──◈
@@ -53,7 +55,15 @@ git clone https://github.com/nbiish/crittercalm.git
 cd crittercalm
 pip install -r requirements.txt
 
-# Models auto-download on first run from Hugging Face Hub
+# Optional: pick a model (default: Qwen/Qwen2.5-7B-Instruct)
+export INFERENCE_MODEL="Qwen/Qwen2.5-7B-Instruct"
+
+# Optional: set the HF token
+export HF_TOKEN="hf_..."
+
+# Optional: tune the cooldown
+export CRITTERCALM_COOLDOWN_SECONDS=12
+
 python app.py
 ```
 
@@ -61,13 +71,18 @@ Then open <http://localhost:7863/>.
 
 ## ☼ ZHOONIYAAWICHIGEWIN / MODEL STACK ◈
 
-| Model | Size | Purpose | License |
-|-------|------|---------|---------|
-| OmniVoice | 0.6B | Voice cloning + TTS | Apache 2.0 |
-| Dolphin-X1-8B | 8B | Calming script generation | Llama 3.1 |
-| Kokoro TTS | 82M | Built-in soothing voices (fallback) | Apache 2.0 |
+| Component | Source | Purpose | License |
+|---|---|---|---|
+| OmniVoice | local (when installed) | Voice cloning + TTS | Apache 2.0 |
+| Kokoro TTS | local (when installed) | Built-in soothing voices (fallback) | Apache 2.0 |
+| Script LLM | **HF Inference API** (serverless) | Calming script generation | varies |
 
-**Total: ~8.7B params** (well under the 32B limit)
+The script LLM uses the HF Inference API — no local GGUF build, configurable per-Space.
+Default: `Qwen/Qwen2.5-7B-Instruct` (small + fast + free tier friendly).
+Override: `CRITTERCALM_MODEL` env var.
+
+**Local components:** 0.6B (OmniVoice) + 82M (Kokoro) = ~0.7B (when installed).
+**API LLM:** 1.5B-9B depending on `INFERENCE_MODEL` choice.
 
 ## ☼ MCP KINOOMAAGEWINAN / MCP TOOLS ◈
 
@@ -79,10 +94,11 @@ Runs with `mcp_server=True` — Streamable HTTP MCP server at `/gradio/gradio_ap
 
 ## ☼ GIIZHIITAA / BADGES ◈
 
-- 🔌  **Off the Grid** — Fully local, no API calls
+- 🔌  **Off the Grid** — Voice cloning + TTS run locally; only the script LLM uses Inference API
 - 🎯  **Well-Tuned** — Fine-tuned voice embeddings for pet-directed speech
 - 📓  **Field Notes** — Blog post on animal psychoacoustics + voice cloning
 - 🎨  **Off-Brand** — Anishinaabe-Solarpunk theme with sky-to-sunrise palette
+- 🌀  **Cooldowns** — Serverless inference with built-in credit protection
 
 ## ☼ INA-WAABANDA'IWEWIN / PROJECT STRUCTURE ◈
 

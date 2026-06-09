@@ -47,10 +47,9 @@ log = logging.getLogger("crittercalm")
 MODEL_DIR = Path(os.environ.get("CRITTERCALM_MODEL_DIR", Path(__file__).parent / "models"))
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
-DOLPHIN_MODEL_PATH = os.environ.get(
-    "DOLPHIN_MODEL_PATH",
-    str(MODEL_DIR / "Dolphin-X1-8B-Q4_K_M.gguf"),
-)
+# Deprecated: Dolphin GGUF path kept as None. Script generation now uses
+# the HF Inference API via content.script_generator (no local GGUF build).
+DOLPHIN_MODEL_PATH = None
 OMNIVOICE_MODEL_ID = os.environ.get("OMNIVOICE_MODEL_ID", "k2-fsa/OmniVoice")
 KOKORO_MODEL_PATH = os.environ.get(
     "KOKORO_MODEL_PATH",
@@ -96,34 +95,12 @@ def get_omnivoice():
         return None
 
 
+# Dolphin LLM is no longer used locally. Script generation now uses the
+# HF Inference API via content.script_generator. The shim below preserves
+# the call sites in case any external MCP tool references it.
 def get_dolphin_llm():
-    """Lazy-load Dolphin-X1-8B via llama.cpp (8B params, Llama 3.1 license)."""
-    global _dolphin_llm
-    if _dolphin_llm is not None:
-        return _dolphin_llm
-    gguf_path = Path(DOLPHIN_MODEL_PATH)
-    if not gguf_path.exists():
-        log.warning(f"Dolphin GGUF not found at {gguf_path}. "
-                     "Download from https://huggingface.co/dphn/Dolphin-X1-8B-GGUF")
-        return None
-    try:
-        from llama_cpp import Llama
-
-        log.info(f"Loading Dolphin-X1-8B from {gguf_path} …")
-        _dolphin_llm = Llama(
-            model_path=str(gguf_path),
-            n_ctx=4096,
-            n_threads=os.cpu_count() or 4,
-            verbose=False,
-        )
-        log.info("Dolphin-X1-8B loaded ✓")
-        return _dolphin_llm
-    except ImportError:
-        log.warning("llama-cpp-python not installed.")
-        return None
-    except Exception as exc:
-        log.error(f"Dolphin load failed: {exc}")
-        return None
+    """Deprecated. Returns None — use the HF Inference API via script_generator."""
+    return None
 
 
 def get_kokoro():
@@ -406,8 +383,19 @@ def generate_calming_audio(
 # ---------------------------------------------------------------------------
 
 def get_model_status() -> str:
-    """Return a markdown summary of which models are available."""
-    lines = ["| Model | Status | Purpose |", "|-------|--------|---------|"]
+    """Return a markdown summary of which models are available + cooldown."""
+    # Get the current cooldown snapshot from the script generator
+    try:
+        from content.script_generator import cooldown_snapshot
+        snap = cooldown_snapshot()
+        cooldown_line = (
+            f"Inference model: `{snap['model']}` · "
+            f"cooldown: {snap['cooldown']['active']} · "
+            f"window: {snap['cooldown']['window_seconds']}s"
+        )
+    except Exception as e:
+        cooldown_line = f"cooldown status unavailable: {e}"
+    lines = [f"> {cooldown_line}\n", "| Model | Status | Purpose |", "|-------|--------|---------|"]
 
     omni = get_omnivoice()
     lines.append(
