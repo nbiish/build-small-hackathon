@@ -31,7 +31,7 @@ log = logging.getLogger("inference")
 # The HF model id used for text generation (VibeThinker 1.5B, Gemma 4 12B, etc.)
 INFERENCE_MODEL = os.environ.get(
     "INFERENCE_MODEL",
-    "google/gemma-2-9b-it",  # 9B, newer, better storytelling
+    "Qwen/Qwen2.5-7B-Instruct",  # 7B, strong storytelling, HF Inference compatible
 )
 
 # Provider: "hf-inference" (free serverless), "together", "fal-ai", "replicate"
