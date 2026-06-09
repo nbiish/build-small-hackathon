@@ -31,7 +31,7 @@ log = logging.getLogger("inference")
 # The HF model id used for text generation (VibeThinker 1.5B, Gemma 4 12B, etc.)
 INFERENCE_MODEL = os.environ.get(
     "INFERENCE_MODEL",
-    "Qwen/Qwen2.5-1.5B-Instruct",  # 1.5B, fast, free-tier friendly
+    "Qwen/Qwen2.5-1.5B-Instruct",  # small, fast, free-tier friendly
 )
 
 # Provider: "hf-inference" (free serverless), "together", "fal-ai", "replicate"
@@ -53,18 +53,28 @@ PROJECT_COOLDOWN_OVERRIDES = {
 
 # Max tokens to request (keeps costs bounded)
 MAX_NEW_TOKENS = int(os.environ.get("INFERENCE_MAX_TOKENS", "220"))
+
+
 # ── Cooldown registry ────────────────────────────────────────────────────────
 @dataclass
 class _CooldownState:
     last_call: float = 0.0
     lock: threading.Lock = field(default_factory=threading.Lock)
+
+
 _states: Dict[str, _CooldownState] = {}
+
+
 def _state(project: str) -> _CooldownState:
     if project not in _states:
         _states[project] = _CooldownState()
     return _states[project]
+
+
 def cooldown_seconds_for(project: str) -> float:
     return PROJECT_COOLDOWN_OVERRIDES.get(project, COOLDOWN_SECONDS)
+
+
 def cooldown_active(project: str) -> bool:
     """Return True if the project is currently in cooldown (cannot run inference)."""
     state = _state(project)
@@ -72,12 +82,16 @@ def cooldown_active(project: str) -> bool:
     if now - state.last_call < cooldown_seconds_for(project):
         return True
     return False
+
+
 def cooldown_remaining(project: str) -> float:
     """Seconds left in the cooldown window (0 if not in cooldown)."""
     state = _state(project)
     elapsed = time.time() - state.last_call
     remaining = cooldown_seconds_for(project) - elapsed
     return max(0.0, remaining)
+
+
 def cooldown_status(project: str) -> dict:
     """Snapshot of cooldown state for the UI."""
     return {
@@ -85,10 +99,14 @@ def cooldown_status(project: str) -> dict:
         "remaining_seconds": round(cooldown_remaining(project), 2),
         "window_seconds": cooldown_seconds_for(project),
     }
+
+
 def _mark_called(project: str) -> None:
     state = _state(project)
     with state.lock:
         state.last_call = time.time()
+
+
 # ── Inference client wrapper ─────────────────────────────────────────────────
 class InferenceResult:
     """A small wrapper so callers don't need to know which API returned text."""
@@ -100,18 +118,24 @@ class InferenceResult:
 
     def __repr__(self) -> str:
         return f"InferenceResult(text={self.text[:50]!r}…, model={self.model!r}, latency={self.latency_s:.2f}s)"
-# We use direct HTTP requests via httpx to bypass huggingface_hub library routing bugs
-# and force the use of the free serverless Inference API.
-import httpx
+
+
+def _get_client():
+    """Lazy-load the InferenceClient to keep boot fast."""
+    from huggingface_hub import InferenceClient
+    return InferenceClient(
+        model=INFERENCE_MODEL,
+        token=HF_TOKEN,
+        provider=INFERENCE_PROVIDER,
+    )
+
+
 def generate(
     project: str,
     messages: List[Dict[str, str]],
     *,
     max_new_tokens: Optional[int] = None,
     temperature: float = 0.7,
-    token: Optional[str] = None,
-    model: Optional[str] = None,
-    custom_endpoint: Optional[str] = None,
 ) -> InferenceResult:
     """Run a chat-style inference call, with cooldown enforcement.
 
@@ -127,66 +151,30 @@ def generate(
         )
 
     max_new_tokens = max_new_tokens or MAX_NEW_TOKENS
+    client = _get_client()
     start = time.time()
-    
-    # Format messages list into a plain text dialogue prompt
-    prompt = ""
-    for msg in messages:
-        role = msg.get("role", "user")
-        content_text = msg.get("content", "").strip()
-        if role == "system":
-            prompt += f"System Instructions:\n{content_text}\n\n"
-        elif role == "user":
-            prompt += f"User:\n{content_text}\n\n"
-        elif role == "assistant":
-            prompt += f"Assistant:\n{content_text}\n\n"
-    prompt += "Assistant:\n"
-
-    # Use overrides if provided
-    use_model = model or INFERENCE_MODEL
-    use_token = token or HF_TOKEN
-
-    # Call direct HF serverless Inference API
-    url = f"https://api.huggingface.co/models/{use_model}"
-    headers = {}
-    if use_token:
-        headers["Authorization"] = f"Bearer {use_token}"
-    
-    payload = {
-        "inputs": prompt,
-        "parameters": {
-            "max_new_tokens": max_new_tokens,
-            "temperature": temperature,
-            "return_full_text": False,
-        }
-    }
-    
-    with httpx.Client(trust_env=True) as http_client:
-        resp = http_client.post(url, json=payload, headers=headers, timeout=30.0)
-    if resp.status_code != 200:
-        raise RuntimeError(f"HF Inference API Error {resp.status_code}: {resp.text}")
-        
-    data = resp.json()
-    # Direct model endpoint returns a list of completions
-    if isinstance(data, list) and len(data) > 0:
-        text = data[0].get("generated_text", "")
-    elif isinstance(data, dict):
-        text = data.get("generated_text", "")
-    else:
-        text = str(data)
-        
+    response = client.chat_completion(
+        messages=messages,
+        max_tokens=max_new_tokens,
+        temperature=temperature,
+    )
     latency = time.time() - start
+    text = response.choices[0].message.content or ""
     text = text.strip()
     _mark_called(project)
     return InferenceResult(
         text=text,
-        model=use_model,
+        model=INFERENCE_MODEL,
         provider=INFERENCE_PROVIDER,
         latency_s=latency,
     )
+
+
 def force_clear_cooldown(project: str) -> None:
     """Manual escape hatch (e.g. for testing or admin overrides)."""
     _state(project).last_call = 0.0
+
+
 # ── Convenience: build messages + format result ──────────────────────────────
 def chat_messages(system: str, user: str, history: Optional[List[Dict[str, str]]] = None) -> List[Dict[str, str]]:
     """Build an OpenAI-style message list with optional prior turns.
@@ -198,6 +186,8 @@ def chat_messages(system: str, user: str, history: Optional[List[Dict[str, str]]
         msgs.extend(history)
     msgs.append({"role": "user", "content": user})
     return msgs
+
+
 __all__ = [
     "InferenceResult",
     "cooldown_active",
@@ -211,6 +201,8 @@ __all__ = [
     "INFERENCE_PROVIDER",
     "MAX_NEW_TOKENS",
 ]
+
+
 if __name__ == "__main__":
     # Smoke test
     for p in ("tinybard", "focusfriend", "crittercalm"):

@@ -23,7 +23,18 @@
             <div class="terminal" id="terminal">
                 <div class="terminal-header">
                     <span class="prompt">ᐴ TINYBARD v1.0 ᔔ  ·  GIIZHI-AADIZOKED</span>
-                    <span class="status" id="health-bar">NOOSISKAAZOWIN: <span id="health-val">100</span></span><button id="config-btn" style="float:right;background:none;border:1px solid var(--asp-amber,#FFB347);color:var(--asp-sun,#F2A93B);cursor:pointer;font-family:monospace;font-size:0.75rem;padding:0.15rem 0.4rem;border-radius:2px;">⚙ CONFIG</button>
+                    <span class="header-controls">
+                        <span class="status" id="health-bar">NOOSISKAAZOWIN: <span id="health-val">100</span></span>
+                        <button id="saves-btn" class="header-btn" title="Saved Games">◈ SAVES</button>
+                        <button id="config-btn" class="header-btn" title="Configuration">⚙ CONFIG</button>
+                        <button id="exit-btn" class="header-btn exit-btn" title="Save & Exit">✕</button>
+                    </span>
+                </div>
+
+                <div class="saves-dropdown" id="saves-dropdown" style="display:none;">
+                    <div class="saves-header">◈ SAVED JOURNEYS</div>
+                    <div class="saves-list" id="saves-list"></div>
+                </div>
                 </div>
 
                 <div class="terminal-body" id="output">
@@ -92,5 +103,26 @@
             <span id="tb-config-status" style="margin-left:0.5rem;color:var(--asp-moss,#588157);"></span>
         </div>
     </div>
+
+    <!-- Save/Exit dialog modal -->
+    <div id="tb-save-modal" class="tb-modal-overlay" style="display:none;">
+        <div class="tb-modal save-modal">
+            <h3>◈ SAVE YOUR JOURNEY?</h3>
+            <p style="font-size:0.8rem;color:var(--asp-moss,#588157);margin-bottom:12px;">
+                Your adventure awaits. Save your progress to continue later.
+            </p>
+            <label for="tb-save-name">Slot Name</label>
+            <input type="text" id="tb-save-name" placeholder="my-adventure" />
+            <div class="save-modal-actions">
+                <button id="tb-save-and-exit" class="save-action-btn">◈ Save & Exit</button>
+                <button id="tb-exit-no-save" class="save-action-btn exit-no-save">✕ Exit Without Saving</button>
+                <button id="tb-save-cancel" class="save-action-btn cancel-btn">← Cancel</button>
+            </div>
+            <span id="tb-save-status" style="display:block;margin-top:8px;color:var(--asp-moss,#588157);font-size:0.75rem;"></span>
+        </div>
+    </div>
+
+    <!-- Resume section (injected into genre selector by JS) -->
+
 </body>
 </html>

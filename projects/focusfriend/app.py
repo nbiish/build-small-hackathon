@@ -1051,7 +1051,16 @@ def create_app() -> gr.Blocks:
 
 
 # ---------------------------------------------------------------------------
+# Entry point
 # ---------------------------------------------------------------------------
-# Entry point — exported for HF Spaces Gradio SDK
-# ---------------------------------------------------------------------------
-app = create_app()
+if __name__ == "__main__":
+    app = create_app()
+    app.launch(
+        server_name="0.0.0.0",
+        server_port=int(os.environ.get("PORT", "7861")),
+        share=False,
+        show_error=True,
+        mcp_server=True,
+        css=FOCUSFRIEND_CSS,
+        head=FOCUSFRIEND_JS,
+    )
