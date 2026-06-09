@@ -19,7 +19,9 @@ import random
 import logging
 import sys
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
+import threading
+from pydantic import BaseModel
 
 import gradio as gr
 from fastapi import FastAPI
@@ -58,6 +60,26 @@ STATIC_DIR = BASE_DIR / "static"
 TINYBARD_MODEL = os.environ.get("TINYBARD_MODEL", INFERENCE_MODEL)
 
 # ---------------------------------------------------------------------------
+# User-configurable inference (BYO token / model)
+# ---------------------------------------------------------------------------
+_USER_CONFIG_LOCK = threading.Lock()
+_USER_CONFIG: Dict[str, Optional[str]] = {
+    "hf_token": None,
+    "model": None,
+}
+
+
+def get_user_hf_token() -> Optional[str]:
+    with _USER_CONFIG_LOCK:
+        return _USER_CONFIG["hf_token"]
+
+
+def get_user_model() -> Optional[str]:
+    with _USER_CONFIG_LOCK:
+        return _USER_CONFIG["model"]
+
+
+# ---------------------------------------------------------------------------
 # Llama.cpp Inference Setup
 # ---------------------------------------------------------------------------
 # No local LLM state — every inference call goes through the HF Inference API
@@ -68,17 +90,18 @@ def llm_available() -> bool:
     """True if we *might* succeed at an inference call (cooldown not active,
     HF_TOKEN configured, model id is set)."""
     import os
-    if not os.environ.get("HF_TOKEN") and not os.environ.get("HUGGINGFACEHUB_API_TOKEN"):
-        # Inference API still works anonymously for some models, so don't gate hard.
-        pass
-    return bool(TINYBARD_MODEL) and not cooldown_active("tinybard")
+    token = get_user_hf_token() or os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACEHUB_API_TOKEN")
+    model = get_user_model() or TINYBARD_MODEL
+    # Inference API still works anonymously for some models, so don't gate hard.
+    return bool(model) and not cooldown_active("tinybard")
 
 
 def last_inference_status() -> dict:
     """Snapshot of the current cooldown + model for /api/model_status."""
     return {
-        "model": TINYBARD_MODEL,
+        "model": get_user_model() or TINYBARD_MODEL,
         "cooldown": cooldown_status("tinybard"),
+        "has_user_token": bool(get_user_hf_token()),
     }
 
 
@@ -508,6 +531,36 @@ async def game_choice(payload: dict):
         health=int(payload.get("health", 100)),
         history=payload.get("history", []),
     )
+
+class UserConfig(BaseModel):
+    hf_token: Optional[str] = None
+    model: Optional[str] = None
+
+
+@fastapi_app.post("/api/config")
+async def update_config(cfg: UserConfig):
+    with _USER_CONFIG_LOCK:
+        if cfg.hf_token:
+            _USER_CONFIG["hf_token"] = cfg.hf_token.strip() or None
+        if cfg.model and cfg.model.strip():
+            _USER_CONFIG["model"] = cfg.model.strip()
+        current = dict(_USER_CONFIG)
+    return {
+        "status": "ok",
+        "model": current["model"] or TINYBARD_MODEL,
+        "has_token": bool(current["hf_token"]),
+    }
+
+
+@fastapi_app.get("/api/config")
+async def get_config():
+    with _USER_CONFIG_LOCK:
+        current = dict(_USER_CONFIG)
+    return {
+        "model": current["model"] or TINYBARD_MODEL,
+        "has_token": bool(current["hf_token"]),
+    }
+
 
 # Mount static files
 fastapi_app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")

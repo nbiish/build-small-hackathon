@@ -243,6 +243,52 @@ cmdInput.addEventListener("keydown", (e) => {
     }
 });
 
+
+// ---------------------------------------------------------------------------
+// User Config Modal
+// ---------------------------------------------------------------------------
+const configBtn = document.getElementById('config-btn');
+const configModal = document.getElementById('tb-config-modal');
+const configClose = document.getElementById('tb-config-close');
+const configSave = document.getElementById('tb-config-save');
+const modelInput = document.getElementById('tb-model-input');
+const tokenInput = document.getElementById('tb-token-input');
+const configStatus = document.getElementById('tb-config-status');
+
+if (configBtn && configModal) {
+    configBtn.addEventListener('click', async () => {
+        const cfg = await fetch('/api/config').then(r => r.json());
+        modelInput.value = cfg.model || '';
+        tokenInput.value = '';
+        configStatus.textContent = '';
+        configModal.style.display = 'flex';
+    });
+
+    configClose.addEventListener('click', () => {
+        configModal.style.display = 'none';
+    });
+
+    configModal.addEventListener('click', (e) => {
+        if (e.target === configModal) configModal.style.display = 'none';
+    });
+
+    configSave.addEventListener('click', async () => {
+        const body = {};
+        if (modelInput.value.trim()) body.model = modelInput.value.trim();
+        if (tokenInput.value.trim()) body.hf_token = tokenInput.value.trim();
+
+        const resp = await fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        const data = await resp.json();
+        configStatus.textContent = data.status === 'ok' ? '✓ Saved' : '✗ Failed';
+        configStatus.style.color = data.status === 'ok' ? 'var(--asp-sun)' : 'var(--asp-ember)';
+        setTimeout(() => { configModal.style.display = 'none'; }, 800);
+    });
+}
+
 // Boot
 // ---------------------------------------------------------------------------
 (async () => {

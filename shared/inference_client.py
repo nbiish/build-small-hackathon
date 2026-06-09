@@ -143,7 +143,7 @@ def generate(
     return InferenceResult(
         text=text,
         model=INFERENCE_MODEL,
-        
+        provider=INFERENCE_PROVIDER,
         latency_s=latency,
     )
 def force_clear_cooldown(project: str) -> None:
