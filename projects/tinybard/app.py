@@ -261,7 +261,7 @@ def create_gradio_app() -> gr.Blocks:
 
     with gr.Blocks(title="TinyBard API") as blocks:
         # Hidden state — not rendered in UI, used by API
-        genre_input = gr.Textbox(label="Genre", visible=False)
+        genre_input = gr.Textbox(label="Genre", value="fantasy", visible=False)
         step_input = gr.Number(label="Step", value=0, visible=False)
         health_input = gr.Number(label="Health", value=100, visible=False)
         choice_input = gr.Textbox(label="Choice", visible=False)
@@ -277,7 +277,7 @@ def create_gradio_app() -> gr.Blocks:
 
         def api_start_game(genre: str):
             """Start a new interactive text adventure. Exposed as MCP tool."""
-            genre = genre.lower()
+            genre = (genre or "fantasy").lower()
             if genre not in ["fantasy", "scifi", "cyberpunk"]:
                 genre = "fantasy"
 
@@ -304,13 +304,14 @@ def create_gradio_app() -> gr.Blocks:
 
         def api_make_choice(choice: str, genre: str, step: int, health: int, history_json: str):
             """Submit a player choice to advance the story. Exposed as MCP tool."""
+            genre = (genre or "fantasy").lower()
             try:
                 history = json.loads(history_json)
             except Exception:
                 history = []
 
-            step = int(step)
-            health = int(health)
+            step = int(step or 0)
+            health = int(health or 100)
 
             # First try LLM narration
             history.append({"role": "player", "text": choice})
