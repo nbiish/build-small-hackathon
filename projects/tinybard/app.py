@@ -255,12 +255,12 @@ def generate_llm_choices(genre: str, story_context: str) -> List[str]:
             temperature=0.6,
         )
         raw = result.text.strip() if result.text else ""
-        logger.info(f"[choices] raw LLM output: {raw!r}")
+        log.info(f"[choices] raw LLM output: {raw!r}")
         choices = _parse_choices(raw)
-        logger.info(f"[choices] parsed {len(choices)} choices: {choices}")
+        log.info(f"[choices] parsed {len(choices)} choices: {choices}")
         return choices
     except Exception:
-        logger.exception("[choices] LLM choice generation failed")
+        log.exception("[choices] LLM choice generation failed")
         return []
 
 
