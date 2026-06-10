@@ -258,23 +258,461 @@ def generate_llm_choices(genre: str, story_context: str) -> List[str]:
 # Gradio Blocks — API endpoints (exposed as MCP tools)
 # ---------------------------------------------------------------------------
 def create_gradio_app() -> gr.Blocks:
-    """Build the Gradio Blocks app with API endpoints for MCP integration."""
+    """Build the Gradio Blocks app with Anishinaabe Solarpunk CRT aesthetic.
 
-    with gr.Blocks(title="TinyBard API") as blocks:
-        # Hidden state — not rendered in UI, used by API
+    API endpoints (start_game, make_choice) are preserved for MCP integration.
+    On HF Spaces, this Gradio UI IS the only interface.
+    """
+
+    # Anishinaabe Solarpunk CRT custom CSS
+    ASP_CSS = """
+    :root {
+        --asp-sky:      #5BA4D9;
+        --asp-water:    #1B4965;
+        --asp-frost:    #CAF0F8;
+        --asp-sun:      #F2A93B;
+        --asp-sunlight: #FFB347;
+        --asp-ember:    #E76F51;
+        --asp-birch:    #F5F1E8;
+        --asp-moss:     #588157;
+        --asp-spruce:   #1B4332;
+        --asp-night:    #0F1A2C;
+        --asp-earth:    #8B3A1F;
+        --asp-stone:    #A89F91;
+    }
+
+    /* Page background */
+    .gradio-container, .app, body {
+        background:
+            radial-gradient(ellipse at top, #1B4965 0%, transparent 60%),
+            radial-gradient(ellipse at bottom right, #1B4332 0%, transparent 70%),
+            #0F1A2C !important;
+        color: #F5F1E8 !important;
+        font-family: Georgia, 'Iowan Old Style', serif !important;
+    }
+
+    /* CRT scanline overlay */
+    .gradio-container::after {
+        content: "";
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: repeating-linear-gradient(
+            0deg,
+            transparent,
+            transparent 2px,
+            rgba(91, 164, 217, 0.04) 2px,
+            rgba(91, 164, 217, 0.04) 4px
+        );
+        pointer-events: none;
+        z-index: 9999;
+    }
+
+    /* Banner */
+    .asp-banner {
+        background: linear-gradient(95deg, #5BA4D9 0%, #1B4965 100%);
+        color: #F5F1E8;
+        border: 1px solid rgba(255, 179, 71, 0.3);
+        border-radius: 10px;
+        padding: 14px 20px;
+        margin-bottom: 16px;
+        font-family: Georgia, serif;
+        text-align: center;
+        text-shadow: 0 1px 2px rgba(15, 26, 44, 0.45);
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+        letter-spacing: 0.5px;
+    }
+    .asp-banner .syll { font-size: 1.6em; opacity: 0.9; }
+    .asp-banner .glyph { color: #FFB347; font-size: 1.15em; }
+    .asp-banner .title {
+        font-size: 1.1em; font-weight: 700;
+        letter-spacing: 2px; text-transform: uppercase;
+    }
+    .asp-banner .subtitle {
+        color: #CAF0F8; font-size: 0.85em;
+        font-style: italic; opacity: 0.85;
+    }
+
+    /* Section containers */
+    .asp-section {
+        background: linear-gradient(160deg, rgba(139, 58, 31, 0.25) 0%, rgba(15, 26, 44, 0.6) 100%);
+        border: 1px solid rgba(91, 164, 217, 0.2);
+        border-radius: 10px;
+        padding: 16px 20px;
+        margin-bottom: 12px;
+        box-shadow:
+            inset 0 0 40px rgba(0, 0, 0, 0.3),
+            0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+    .asp-section::before {
+        content: "\\25C8";
+        display: block;
+        color: #F2A93B;
+        font-size: 0.7rem;
+        letter-spacing: 6px;
+        margin-bottom: 6px;
+        opacity: 0.5;
+        text-align: center;
+    }
+
+    /* Section labels */
+    .asp-label {
+        color: #CAF0F8 !important;
+        font-family: Georgia, serif !important;
+        font-size: 0.72rem !important;
+        text-transform: uppercase !important;
+        letter-spacing: 2px !important;
+        margin-bottom: 8px !important;
+        text-shadow: 0 0 6px rgba(91, 164, 217, 0.3);
+    }
+
+    /* Genre radio buttons */
+    .asp-genre label {
+        background: rgba(15, 26, 44, 0.4) !important;
+        border: 1px solid rgba(91, 164, 217, 0.3) !important;
+        border-radius: 4px !important;
+        color: #CAF0F8 !important;
+        padding: 10px 18px !important;
+        font-family: Georgia, serif !important;
+        font-size: 0.82rem !important;
+        letter-spacing: 1.5px !important;
+        text-transform: uppercase !important;
+        cursor: pointer !important;
+        transition: all 0.2s !important;
+    }
+    .asp-genre label:hover {
+        background: rgba(242, 169, 59, 0.15) !important;
+        border-color: #F2A93B !important;
+        color: #FFB347 !important;
+        text-shadow: 0 0 12px rgba(242, 169, 59, 0.5);
+    }
+    .asp-genre input[type="radio"]:checked + span {
+        color: #FFB347 !important;
+        text-shadow: 0 0 8px rgba(242, 169, 59, 0.5);
+    }
+
+    /* Choice radio buttons */
+    .asp-choices label {
+        display: block !important;
+        background: rgba(15, 26, 44, 0.3) !important;
+        border: 1px solid rgba(91, 164, 217, 0.25) !important;
+        border-radius: 3px !important;
+        color: #CAF0F8 !important;
+        padding: 10px 16px !important;
+        margin-bottom: 4px !important;
+        font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Menlo, monospace !important;
+        font-size: 0.82rem !important;
+        cursor: pointer !important;
+        transition: all 0.15s !important;
+        text-shadow: 0 0 3px rgba(91, 164, 217, 0.2);
+    }
+    .asp-choices label:hover {
+        background: rgba(91, 164, 217, 0.1) !important;
+        border-color: #F2A93B !important;
+        color: #FFB347 !important;
+        padding-left: 26px !important;
+        box-shadow: 0 0 12px rgba(242, 169, 59, 0.15);
+    }
+
+    /* Buttons */
+    .asp-btn {
+        background: linear-gradient(95deg, rgba(139, 58, 31, 0.4) 0%, rgba(27, 67, 50, 0.4) 100%) !important;
+        border: 1px solid rgba(91, 164, 217, 0.35) !important;
+        border-radius: 4px !important;
+        color: #CAF0F8 !important;
+        font-family: Georgia, serif !important;
+        font-size: 0.82rem !important;
+        letter-spacing: 1.5px !important;
+        text-transform: uppercase !important;
+        padding: 10px 22px !important;
+        cursor: pointer !important;
+        transition: all 0.2s !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+    .asp-btn:hover {
+        background: linear-gradient(95deg, rgba(242, 169, 59, 0.25) 0%, rgba(91, 164, 217, 0.25) 100%) !important;
+        border-color: #F2A93B !important;
+        color: #FFB347 !important;
+        box-shadow: 0 0 18px rgba(242, 169, 59, 0.3);
+        text-shadow: 0 0 8px rgba(242, 169, 59, 0.4);
+    }
+    .asp-btn-primary {
+        background: linear-gradient(95deg, #8B3A1F 0%, #1B4332 100%) !important;
+        border-color: rgba(242, 169, 59, 0.5) !important;
+        box-shadow: 0 0 16px rgba(242, 169, 59, 0.15);
+    }
+    .asp-btn-primary:hover {
+        box-shadow: 0 0 24px rgba(242, 169, 59, 0.4) !important;
+    }
+
+    /* Story output */
+    .asp-story textarea {
+        background: rgba(15, 26, 44, 0.5) !important;
+        border: none !important;
+        border-left: 3px solid #F2A93B !important;
+        border-radius: 0 6px 6px 0 !important;
+        color: #F5F1E8 !important;
+        font-family: Georgia, 'Iowan Old Style', serif !important;
+        font-size: 0.92rem !important;
+        line-height: 1.7 !important;
+        padding: 14px 18px !important;
+        text-shadow: 0 0 6px rgba(242, 169, 59, 0.12);
+        box-shadow: inset 0 0 30px rgba(15, 26, 44, 0.4);
+        animation: fadeSlideIn 0.5s ease-out;
+    }
+
+    /* Textbox inputs */
+    .asp-input textarea, .asp-input input {
+        background: rgba(15, 26, 44, 0.5) !important;
+        border: 1px solid rgba(91, 164, 217, 0.3) !important;
+        border-radius: 4px !important;
+        color: #F5F1E8 !important;
+        font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Menlo, monospace !important;
+        font-size: 0.88rem !important;
+        caret-color: #F2A93B !important;
+    }
+    .asp-input textarea:focus, .asp-input input:focus {
+        border-color: #F2A93B !important;
+        box-shadow: 0 0 12px rgba(242, 169, 59, 0.2);
+        outline: none !important;
+    }
+
+    /* Status row */
+    .asp-status {
+        background: rgba(15, 26, 44, 0.4) !important;
+        border: 1px solid rgba(91, 164, 217, 0.15) !important;
+        border-radius: 6px !important;
+        padding: 10px 16px !important;
+    }
+    .asp-status label {
+        color: #CAF0F8 !important;
+        font-family: Georgia, serif !important;
+        font-size: 0.7rem !important;
+        text-transform: uppercase !important;
+        letter-spacing: 1.5px !important;
+    }
+
+    /* Footer */
+    .asp-footer {
+        text-align: center;
+        padding: 10px 0 4px;
+        border-top: 1px solid rgba(91, 164, 217, 0.15);
+        margin-top: 8px;
+        font-size: 0.65rem;
+        color: #A89F91;
+        letter-spacing: 1.5px;
+        font-family: Georgia, serif;
+    }
+
+    @keyframes fadeSlideIn {
+        from { opacity: 0; transform: translateX(-10px); }
+        to   { opacity: 1; transform: translateX(0); }
+    }
+
+    label, .wrap > label {
+        color: #CAF0F8 !important;
+        font-family: Georgia, serif !important;
+    }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb {
+        background: rgba(91, 164, 217, 0.25);
+        border-radius: 3px;
+    }
+
+    @media (max-width: 600px) {
+        .asp-banner { padding: 10px 14px; font-size: 0.85em; }
+        .asp-section { padding: 12px; }
+    }
+    """
+
+    with gr.Blocks(title="TinyBard") as blocks:
+
+        blocks.theme = gr.themes.Base(
+            primary_hue="amber",
+            neutral_hue="slate",
+        ).set(
+            body_background_fill="#0F1A2C",
+            body_text_color="#F5F1E8",
+            block_background_fill="rgba(15, 26, 44, 0.3)",
+            block_border_color="rgba(91, 164, 217, 0.2)",
+            block_label_text_color="#CAF0F8",
+            input_background_fill="rgba(15, 26, 44, 0.5)",
+            input_border_color="rgba(91, 164, 217, 0.3)",
+            button_primary_background_fill="linear-gradient(95deg, #8B3A1F, #1B4332)",
+            button_primary_border_color="rgba(242, 169, 59, 0.5)",
+            button_primary_text_color="#CAF0F8",
+            button_secondary_background_fill="rgba(139, 58, 31, 0.3)",
+            button_secondary_border_color="rgba(91, 164, 217, 0.35)",
+            button_secondary_text_color="#CAF0F8",
+        )
+
+        # Inject CSS via HTML since Gradio 6.0 has no css= param on Blocks
+        gr.HTML(f"<style>{ASP_CSS}</style>")
+
+        # Banner
+        gr.HTML(
+            '<div class="asp-banner">'
+            '<span class="syll">\u1434</span> '
+            '<span class="glyph">\u263C</span> '
+            '<span class="title">TINYBARD</span> '
+            '<span class="glyph">\u2618</span> '
+            '<span class="subtitle">\u2014 a fire-fly storyteller in cedar and copper \u2014</span> '
+            '<span class="syll">\u1514</span>'
+            '</div>'
+        )
+
+        # Hidden state fields (for internal tracking + MCP API)
         genre_input = gr.Textbox(label="Genre", value="fantasy", visible=False)
         step_input = gr.Number(label="Step", value=0, visible=False)
         health_input = gr.Number(label="Health", value=100, visible=False)
-        choice_input = gr.Textbox(label="Choice", visible=False)
         history_input = gr.Textbox(label="History JSON", value="[]", visible=False)
 
-        # Output fields
-        story_output = gr.Textbox(label="Story")
-        choices_output = gr.JSON(label="Choices")
-        health_output = gr.Number(label="Health")
-        step_output = gr.Number(label="Step")
-        game_over_output = gr.Checkbox(label="Game Over")
-        history_output = gr.Textbox(label="History JSON")
+        # Genre selector
+        with gr.Group(elem_classes=["asp-section"]):
+            gr.HTML('<div class="asp-label">\u1434 INAABANDA\u0027IWIN / SELECT GENRE \u1514</div>')
+            genre_radio = gr.Radio(
+                choices=[
+                    ("\u263C Aadizookaan / Fantasy", "fantasy"),
+                    ("\u25C8 Ishpiming / Sci-Fi", "scifi"),
+                    ("\u25C6 Mashkodewaazibi / Cyberpunk", "cyberpunk"),
+                ],
+                value="fantasy",
+                label=None,
+                show_label=False,
+                elem_classes=["asp-genre"],
+            )
+
+        # Story output
+        with gr.Group(elem_classes=["asp-section"]):
+            gr.HTML('<div class="asp-label">\u1434 AADIZOOKAAN / STORY \u1514</div>')
+            story_output = gr.Textbox(
+                label="Story",
+                show_label=False,
+                lines=8,
+                max_lines=20,
+                interactive=False,
+                elem_classes=["asp-story"],
+            )
+
+        # Choices radio (populated after game start)
+        with gr.Group(elem_classes=["asp-section"]):
+            gr.HTML('<div class="asp-label">\u1434 INAABANDA\u0027IWIN / CHOOSE \u1514</div>')
+            choice_radio = gr.Radio(
+                choices=[],
+                label=None,
+                show_label=False,
+                interactive=True,
+                elem_classes=["asp-choices"],
+            )
+
+        # Choice text input (fallback / custom choice)
+        with gr.Group(elem_classes=["asp-section"]):
+            gr.HTML('<div class="asp-label">\u1434 NINDANOKIMAA / TYPE YOUR ACTION \u1514</div>')
+            choice_text_input = gr.Textbox(
+                label="Type your choice",
+                show_label=False,
+                placeholder="Type your action or select above...",
+                lines=1,
+                max_lines=3,
+                elem_classes=["asp-input"],
+            )
+
+        # Action buttons
+        with gr.Row():
+            start_btn = gr.Button(
+                "\u263C START GAME",
+                variant="primary",
+                elem_classes=["asp-btn", "asp-btn-primary"],
+                scale=2,
+            )
+            choice_btn = gr.Button(
+                "\u25C8 MAKE CHOICE",
+                variant="secondary",
+                elem_classes=["asp-btn"],
+                scale=2,
+            )
+            save_btn = gr.Button(
+                "\u25C6 SAVE",
+                variant="secondary",
+                elem_classes=["asp-btn"],
+                scale=1,
+            )
+            load_btn = gr.Button(
+                "\u2618 LOAD",
+                variant="secondary",
+                elem_classes=["asp-btn"],
+                scale=1,
+            )
+
+        # Save slot input
+        with gr.Group(elem_classes=["asp-section"]):
+            gr.HTML('<div class="asp-label">\u1434 OZHIIMAAGAN / SAVE SLOT \u1514</div>')
+            save_slot_input = gr.Textbox(
+                label="Slot Name",
+                show_label=False,
+                placeholder="my-adventure",
+                lines=1,
+                elem_classes=["asp-input"],
+            )
+            save_status = gr.Textbox(
+                label="Save Status",
+                show_label=False,
+                interactive=False,
+                lines=1,
+                elem_classes=["asp-input"],
+            )
+
+        # Status bar
+        with gr.Row(elem_classes=["asp-status"]):
+            health_output = gr.Number(label="NOOSISKAAZOWIN / Health", value=100, interactive=False)
+            step_output = gr.Number(label="DIBIK / Step", value=0, interactive=False)
+            game_over_output = gr.Checkbox(label="GIIZHIG / Game Over", value=False, interactive=False)
+
+        # Choices JSON (hidden for MCP/debug)
+        choices_output = gr.JSON(label="Choices JSON", visible=False, elem_classes=["asp-json"])
+        history_output = gr.Textbox(label="History JSON", visible=False)
+
+        # Footer
+        gr.HTML(
+            '<div class="asp-footer">'
+            '\u1434 TinyBard \u00b7 FastAPI + Gradio + MCP \u00b7 Anishinaabe Solarpunk \u1514'
+            '</div>'
+        )
+
+        # ================================================================
+        # Event Handlers
+        # ================================================================
+
+        # Sync genre radio to hidden genre_input
+        def sync_genre(genre_val):
+            return genre_val or "fantasy"
+
+        genre_radio.change(
+            fn=sync_genre,
+            inputs=[genre_radio],
+            outputs=[genre_input],
+        )
+
+        # Sync choice radio selection to text input
+        def sync_choice_to_text(radio_val, current_text):
+            if radio_val:
+                return radio_val
+            return current_text
+
+        choice_radio.change(
+            fn=sync_choice_to_text,
+            inputs=[choice_radio, choice_text_input],
+            outputs=[choice_text_input],
+        )
+
+        # Update choice radio from choices JSON
+        def update_choices_radio(choices_json):
+            if not choices_json:
+                return gr.update(choices=[], value=None)
+            if isinstance(choices_json, list):
+                return gr.update(choices=choices_json, value=None)
+            return gr.update(choices=[], value=None)
 
         def api_start_game(genre: str):
             """Start a new interactive text adventure. Exposed as MCP tool."""
@@ -282,11 +720,9 @@ def create_gradio_app() -> gr.Blocks:
             if genre not in ["fantasy", "scifi", "cyberpunk"]:
                 genre = "fantasy"
 
-            # Try LLM first (will skip if cooldown is active)
             instruction = "Narrate the beginning of the adventure. What happens first? Do not offer choices yet."
             story = generate_llm_story(genre, [], instruction)
             if not story:
-                # Procedural fallback
                 result = generate_procedural_step(genre, 0, 100)
                 return (
                     result["story"], result["choices"], result["health"],
@@ -297,7 +733,6 @@ def create_gradio_app() -> gr.Blocks:
             history = [{"role": "narrator", "text": story}]
             choices = generate_llm_choices(genre, story)
             if len(choices) < 2:
-                # Use the procedural choices
                 fallback = generate_procedural_step(genre, 0, 100)
                 choices = fallback["choices"]
 
@@ -314,7 +749,6 @@ def create_gradio_app() -> gr.Blocks:
             step = int(step or 0)
             health = int(health or 100)
 
-            # First try LLM narration
             history.append({"role": "player", "text": choice})
 
             health_delta = random.choice([-15, 0, 10])
@@ -328,7 +762,6 @@ def create_gradio_app() -> gr.Blocks:
                     [], 0, step + 1, True, json.dumps(history)
                 )
 
-            # No step cap — adventure continues infinitely until health reaches 0
             instruction = "Narrate what happens next as a result of the player's choice."
             story = generate_llm_story(genre, history, instruction)
             if not story:
@@ -347,19 +780,140 @@ def create_gradio_app() -> gr.Blocks:
 
             return (story, choices[:3], new_health, step + 1, False, json.dumps(history))
 
-        # Register API endpoints
-        gr.Button("Start Game").click(
+        # Helper: resolve choice from radio or text input
+        def resolve_choice(choice_text, choice_radio_val):
+            """Use text input if filled, otherwise use radio selection."""
+            if choice_text and choice_text.strip():
+                return choice_text.strip()
+            if choice_radio_val:
+                return choice_radio_val
+            return ""
+
+        # Make Choice: resolve choice, then call api_make_choice
+        def handle_make_choice(choice_text, choice_radio_val, genre, step, health, history_json):
+            resolved = resolve_choice(choice_text, choice_radio_val)
+            if not resolved:
+                return (
+                    "Please type or select a choice before making your move.",
+                    gr.update(), 100, 0, False, "[]",
+                    "", gr.update()
+                )
+            story, choices, h, s, go, hist = api_make_choice(resolved, genre, step, health, history_json)
+            return story, choices, h, s, go, hist, "", gr.update(choices=choices or [], value=None)
+
+        # Start Game: call api_start_game, clear choice input, update radio
+        def handle_start_game(genre):
+            story, choices, h, s, go, hist = api_start_game(genre)
+            return story, choices, h, s, go, hist, "", gr.update(choices=choices or [], value=None)
+
+        # API endpoints (preserved for MCP)
+        start_btn.click(
             fn=api_start_game,
             inputs=[genre_input],
             outputs=[story_output, choices_output, health_output, step_output, game_over_output, history_output],
-            api_name="start_game"
+            api_name="start_game",
         )
 
-        gr.Button("Make Choice").click(
+        # UI start game button: also updates choices radio and clears text
+        start_btn.click(
+            fn=handle_start_game,
+            inputs=[genre_input],
+            outputs=[story_output, choices_output, health_output, step_output, game_over_output, history_output, choice_text_input, choice_radio],
+        )
+
+        # API make_choice endpoint (preserved for MCP)
+        choice_btn.click(
             fn=api_make_choice,
-            inputs=[choice_input, genre_input, step_input, health_input, history_input],
+            inputs=[choice_text_input, genre_input, step_input, health_input, history_input],
             outputs=[story_output, choices_output, health_output, step_output, game_over_output, history_output],
-            api_name="make_choice"
+            api_name="make_choice",
+        )
+
+        # UI make choice button: resolves radio/text, updates choices radio
+        choice_btn.click(
+            fn=handle_make_choice,
+            inputs=[choice_text_input, choice_radio, genre_input, step_input, health_input, history_input],
+            outputs=[story_output, choices_output, health_output, step_output, game_over_output, history_output, choice_text_input, choice_radio],
+        )
+
+        # Save game handler
+        def handle_save(slot_name, genre, step, health, history_json, game_over):
+            import urllib.request
+            import urllib.error
+            if not slot_name or not slot_name.strip():
+                return "Please enter a save slot name."
+            try:
+                history = json.loads(history_json) if history_json else []
+            except Exception:
+                history = []
+            payload = json.dumps({
+                "slot_name": slot_name.strip(),
+                "genre": genre or "fantasy",
+                "step": int(step or 0),
+                "health": int(health or 100),
+                "history": history,
+                "game_over": bool(game_over),
+            }).encode()
+            try:
+                req = urllib.request.Request(
+                    "/api/game/save",
+                    data=payload,
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(req) as resp:
+                    result = json.loads(resp.read())
+                    return f"Saved to '{result.get('slot_name', slot_name)}'"
+            except Exception as e:
+                return f"Save failed: {e}"
+
+        save_btn.click(
+            fn=handle_save,
+            inputs=[save_slot_input, genre_input, step_input, health_input, history_input, game_over_output],
+            outputs=[save_status],
+        )
+
+        # Load game handler
+        def handle_load(slot_name):
+            import urllib.request
+            if not slot_name or not slot_name.strip():
+                return "Enter a slot name to load.", gr.update(), 100, 0, False, "[]", ""
+            try:
+                payload = json.dumps({"slot_name": slot_name.strip()}).encode()
+                req = urllib.request.Request(
+                    "/api/game/load",
+                    data=payload,
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(req) as resp:
+                    result = json.loads(resp.read())
+                    if result.get("status") != "ok":
+                        return f"Load failed: {result.get('message', 'Unknown error')}", gr.update(), 100, 0, False, "[]", ""
+                    choices = result.get("choices", [])
+                    history = result.get("history", [])
+                    story = ""
+                    if history:
+                        for h in reversed(history):
+                            if h.get("role") == "narrator":
+                                story = h.get("text", "")
+                                break
+                    return (
+                        story or "Game loaded.",
+                        gr.update(choices=choices, value=None),
+                        result.get("health", 100),
+                        result.get("step", 0),
+                        result.get("game_over", False),
+                        json.dumps(history),
+                        f"Loaded '{result.get('slot_name', slot_name)}'",
+                    )
+            except Exception as e:
+                return f"Load failed: {e}", gr.update(), 100, 0, False, "[]", ""
+
+        load_btn.click(
+            fn=handle_load,
+            inputs=[save_slot_input],
+            outputs=[story_output, choice_radio, health_output, step_output, game_over_output, history_input, save_status],
         )
 
     return blocks
