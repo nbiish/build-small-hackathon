@@ -18,6 +18,17 @@ let gameState = {
     saveSlot: null
 };
 
+let currentAudio = null;
+
+function playTtsAudio(url) {
+    if (currentAudio) {
+        currentAudio.pause();
+        currentAudio = null;
+    }
+    currentAudio = new Audio(url);
+    currentAudio.play().catch(e => console.log("Audio play failed or interrupted:", e));
+}
+
 // ---------------------------------------------------------------------------
 // DOM refs
 // ---------------------------------------------------------------------------
@@ -148,6 +159,10 @@ async function startGame(genre) {
         storyEl.textContent = data.story;
         output.appendChild(storyEl);
 
+        if (data.audio_url) {
+            playTtsAudio(data.audio_url);
+        }
+
         if (data.game_over) {
             endGame(data);
         } else {
@@ -183,6 +198,10 @@ async function handleChoice(choice) {
         storyEl.className = "story-text";
         storyEl.textContent = data.story;
         output.appendChild(storyEl);
+
+        if (data.audio_url) {
+            playTtsAudio(data.audio_url);
+        }
 
         if (data.game_over) {
             endGame(data);
@@ -531,6 +550,10 @@ async function loadSavedGame(slotName) {
                 storyEl.className = "story-text";
                 storyEl.textContent = data.story;
                 output.appendChild(storyEl);
+            }
+
+            if (data.audio_url) {
+                playTtsAudio(data.audio_url);
             }
 
             if (data.game_over) {

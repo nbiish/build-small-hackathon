@@ -83,6 +83,203 @@ def last_inference_status() -> dict:
     }
 
 
+def strip_option_prefix(choice: str) -> str:
+    """Strip 'Option one: ', 'Option 1: ', etc. prefixes from choice text."""
+    import re
+    cleaned = re.sub(r"^(option\s+(one|two|three|\d+)[\s:\-]*)\s*", "", choice, flags=re.IGNORECASE)
+    return cleaned.strip()
+
+
+def get_kokoro_model_paths():
+    """Download (if not cached) and return paths to Kokoro ONNX model and voices bin."""
+    from huggingface_hub import hf_hub_download
+    repo_id = "fastrtc/kokoro-onnx"
+    try:
+        onnx_path = hf_hub_download(repo_id=repo_id, filename="kokoro-v1.0.onnx")
+        voices_path = hf_hub_download(repo_id=repo_id, filename="voices-v1.0.bin")
+        return onnx_path, voices_path
+    except Exception as e:
+        log.error(f"Failed to download/load Kokoro model from Hugging Face: {e}")
+        return None, None
+
+
+_kokoro_client = None
+
+
+def get_kokoro_client():
+    global _kokoro_client
+    if _kokoro_client is not None:
+        return _kokoro_client
+
+    try:
+        import pathlib
+        import ctypes
+        import espeakng_loader
+        from phonemizer.backend.espeak.wrapper import EspeakWrapper
+
+        # 1. Patch set_data_path
+        if not hasattr(EspeakWrapper, "set_data_path"):
+            @classmethod
+            def set_data_path(cls, path):
+                cls._data_path = pathlib.Path(path) if path else None
+            EspeakWrapper.set_data_path = set_data_path
+
+        # 2. Patch ctypes.cdll.LoadLibrary globally to fix espeak_Initialize NULL crash on macOS
+        if not hasattr(ctypes.cdll, "_orig_load_library"):
+            orig_load = ctypes.cdll.LoadLibrary
+            ctypes.cdll._orig_load_library = orig_load
+
+            def patched_load_library(path, *args, **kwargs):
+                lib = orig_load(path, *args, **kwargs)
+                if "libespeak-ng" in str(path) or "espeak" in str(path):
+                    orig_initialize = lib.espeak_Initialize
+                    def patched_initialize(output, buflength, path_arg, options):
+                        if not path_arg:
+                            d_path = espeakng_loader.get_data_path()
+                            path_arg = d_path.encode('utf-8')
+                        return orig_initialize(output, buflength, path_arg, options)
+                    lib.espeak_Initialize = patched_initialize
+                return lib
+            ctypes.cdll.LoadLibrary = patched_load_library
+
+    except Exception as patch_err:
+        log.warning(f"Failed to patch phonemizer/ctypes: {patch_err}")
+
+    onnx_path, voices_path = get_kokoro_model_paths()
+    if not onnx_path or not voices_path:
+        log.warning("Kokoro model files are not available.")
+        return None
+
+    try:
+        from kokoro_onnx import Kokoro
+        _kokoro_client = Kokoro(onnx_path, voices_path)
+        log.info("Kokoro TTS successfully initialized for TinyBard ✓")
+        return _kokoro_client
+    except Exception as e:
+        log.error(f"Failed to initialize Kokoro client: {e}")
+        return None
+
+def cleanup_old_audio(audio_dir: Path, max_age_seconds: int = 300):
+    """Delete audio files older than max_age_seconds to save disk space."""
+    import time
+    try:
+        now = time.time()
+        for f in audio_dir.glob("*.wav"):
+            if f.is_file() and (now - f.stat().st_mtime) > max_age_seconds:
+                try:
+                    f.unlink()
+                except Exception:
+                    pass
+    except Exception as e:
+        log.warning(f"Error during audio cleanup: {e}")
+
+
+MOOD_MAPPING = {
+    "cutesy": {"voice": "af_nicole", "speed": 1.1},
+    "fun": {"voice": "af_heart", "speed": 1.05},
+    "adventurous": {"voice": "af_sarah", "speed": 1.0},
+    "mystery": {"voice": "af_bella", "speed": 0.85},
+    "sci-fi": {"voice": "am_michael", "speed": 0.95},
+    "cyberpunk": {"voice": "am_michael", "speed": 1.05},
+}
+
+
+def clean_tts_text(text: str) -> str:
+    cleaned = text.replace("*", "").replace("_", "").replace("`", "")
+    import re
+    cleaned = re.sub(r"\[MOOD:\s*[^\]]+\]", "", cleaned, flags=re.IGNORECASE)
+    return cleaned.strip()
+
+
+def generate_tts_for_turn(story_text: str, choices: List[str], genre: str) -> tuple[Optional[str], Optional[str]]:
+    """
+    Generate TTS audio for the given story and choices.
+    Returns (relative_url, local_filepath) or (None, None) if failed.
+    """
+    import uuid
+    import numpy as np
+    import soundfile as sf
+    import re
+
+    audio_dir = STATIC_DIR / "audio"
+    audio_dir.mkdir(parents=True, exist_ok=True)
+    cleanup_old_audio(audio_dir)
+
+    kokoro = get_kokoro_client()
+    if not kokoro:
+        log.warning("Kokoro client not initialized, skipping TTS generation.")
+        return None, None
+
+    mood_match = re.search(r"\[MOOD:\s*([a-zA-Z0-9_\-]+)\]", story_text)
+    if mood_match:
+        mood = mood_match.group(1).lower()
+    else:
+        if genre == "cyberpunk":
+            mood = "cyberpunk"
+        elif genre == "scifi":
+            mood = "sci-fi"
+        elif genre == "fantasy":
+            mood = "adventurous"
+        else:
+            mood = "fun"
+
+    clean_story = re.sub(r"\[MOOD:\s*[a-zA-Z0-9_\-]+\]", "", story_text).strip()
+    clean_story = clean_tts_text(clean_story)
+
+    script_parts = [clean_story]
+
+    prefixed_choices_text = []
+    prefixes = ["Option one", "Option two", "Option three"]
+    for i, choice in enumerate(choices[:3]):
+        clean_choice = strip_option_prefix(choice)
+        prefixed_choices_text.append(f"{prefixes[i]}: {clean_choice}")
+
+    if prefixed_choices_text:
+        script_parts.append(" ".join(prefixed_choices_text))
+
+    full_script = "\n\n".join(script_parts)
+    log.info(f"Generating TTS for mood '{mood}':\n{full_script}")
+
+    mood_config = MOOD_MAPPING.get(mood, {"voice": "af_sarah", "speed": 1.0})
+    voice = mood_config["voice"]
+    speed = mood_config["speed"]
+
+    try:
+        sentences = []
+        for p in full_script.split("\n\n"):
+            for s in p.split("."):
+                s_strip = s.strip()
+                if s_strip:
+                    sentences.append(s_strip + ".")
+
+        chunks = []
+        sample_rate = 24000
+        for i, sentence in enumerate(sentences):
+            samples, sr = kokoro.create(
+                text=sentence,
+                voice=voice,
+                speed=speed,
+                lang="en-us"
+            )
+            chunks.append(samples)
+            sample_rate = sr
+
+        if not chunks:
+            return None, None
+
+        audio_data = np.concatenate(chunks)
+
+        filename = f"turn_{uuid.uuid4().hex}.wav"
+        output_path = audio_dir / filename
+        sf.write(str(output_path), audio_data, sample_rate)
+
+        log.info(f"TTS generated successfully: {output_path}")
+        return f"/static/audio/{filename}", str(output_path)
+    except Exception as e:
+        log.exception(f"Failed to generate TTS audio: {e}")
+        return None, None
+
+
 # ---------------------------------------------------------------------------
 # Procedural Fallback Adventure Engine
 # ---------------------------------------------------------------------------
@@ -200,7 +397,10 @@ def _parse_messages(genre: str, history: List[Dict[str, str]], next_instruction:
         "Keep descriptions atmospheric but concise (2-3 sentences). "
         "Be unpredictable — every story beat should surprise. "
         "Never repeat the same scene twice. "
-        "Focus on action, mystery, and choice. Do not offer numbered choices unless asked."
+        "Focus on action, mystery, and choice. Do not offer numbered choices unless asked. "
+        "At the very end of your response, append a single tag indicating the mood of this scene "
+        "from one of these: [MOOD: cutesy], [MOOD: adventurous], [MOOD: mystery], [MOOD: sci-fi], [MOOD: cyberpunk], [MOOD: fun]. "
+        "Choose the mood that best fits the scene. Example: 'You step into the dark corridor. [MOOD: mystery]'"
     )
     msgs: List[Dict[str, str]] = [{"role": "system", "content": system}]
 
@@ -638,6 +838,18 @@ def create_gradio_app() -> gr.Blocks:
                 elem_classes=["asp-choices"],
             )
 
+        # Audio Player (auto-plays TTS if available)
+        with gr.Group(elem_classes=["asp-section"]):
+            gr.HTML('<div class="asp-label">\u1434 AADIZOOKAAN-MADWEEWEBINIGAN / AUDIO NARRATOR \u1514</div>')
+            audio_output = gr.Audio(
+                label=None,
+                show_label=False,
+                autoplay=True,  # Automatically plays on updates
+                interactive=False,
+                type="filepath",
+                elem_classes=["asp-audio"],
+            )
+
         # Choice text input (fallback / custom choice)
         with gr.Group(elem_classes=["asp-section"]):
             gr.HTML('<div class="asp-label">\u1434 NINDANOKIMAA / TYPE YOUR ACTION \u1514</div>')
@@ -751,24 +963,12 @@ def create_gradio_app() -> gr.Blocks:
             genre = (genre or "fantasy").lower()
             if genre not in ["fantasy", "scifi", "cyberpunk"]:
                 genre = "fantasy"
-
-            instruction = "Narrate the beginning of the adventure. What happens first? Do not offer choices yet."
-            story = generate_llm_story(genre, [], instruction)
-            if not story:
-                result = generate_procedural_step(genre, 0, 100)
-                return (
-                    result["story"], result["choices"], result["health"],
-                    result["step"], result["game_over"],
-                    json.dumps(result.get("history", []))
-                )
-
-            history = [{"role": "narrator", "text": story}]
-            choices = generate_llm_choices(genre, story, history)
-            if len(choices) < 2:
-                fallback = generate_procedural_step(genre, 0, 100)
-                choices = fallback["choices"]
-
-            return (story, choices[:3], 100, 1, False, json.dumps(history))
+            res = _run_turn(choice="", genre=genre, step=0, health=100, history=[])
+            return (
+                res["story"], res["choices"], res["health"],
+                res["step"], res["game_over"], json.dumps(res["history"]),
+                res.get("audio_path")
+            )
 
         def api_make_choice(choice: str, genre: str, step: int, health: int, history_json: str):
             """Submit a player choice to advance the story. Exposed as MCP tool."""
@@ -777,44 +977,12 @@ def create_gradio_app() -> gr.Blocks:
                 history = json.loads(history_json)
             except Exception:
                 history = []
-
-            step = int(step or 0)
-            health = int(health or 100)
-
-            history.append({"role": "player", "text": choice})
-
-            health_delta = _llm_health_delta(genre, choice, history)
-            new_health = max(0, min(100, health + health_delta))
-
-            if new_health <= 0:
-                instruction = "The player has run out of health. Narrate a quick, dramatic end. Game Over."
-                story = generate_llm_story(genre, history, instruction)
-                return (
-                    story or "Your strength fails. The adventure ends in darkness.",
-                    [], 0, step + 1, True, json.dumps(history)
-                )
-
-            instruction = (
-                f"The player chose: '{choice}'. "
-                "Narrate what happens next as a direct consequence of this action. "
-                "Be specific to their choice — reference what they did and its immediate result."
+            res = _run_turn(choice=choice, genre=genre, step=step, health=health, history=history)
+            return (
+                res["story"], res["choices"], res["health"],
+                res["step"], res["game_over"], json.dumps(res["history"]),
+                res.get("audio_path")
             )
-            story = generate_llm_story(genre, history, instruction)
-            if not story:
-                result = generate_procedural_step(genre, step, health, choice)
-                return (
-                    result["story"], result["choices"], result["health"],
-                    result["step"], result["game_over"],
-                    json.dumps(result.get("history", history))
-                )
-
-            history.append({"role": "narrator", "text": story})
-
-            choices = generate_llm_choices(genre, story, history)
-            if len(choices) < 2:
-                choices = ["Move forward", "Look around", "Rest a moment"]
-
-            return (story, choices[:3], new_health, step + 1, False, json.dumps(history))
 
         # Helper: resolve choice from radio or text input
         def resolve_choice(choice_text, choice_radio_val):
@@ -832,21 +1000,21 @@ def create_gradio_app() -> gr.Blocks:
                 return (
                     "Please type or select a choice before making your move.",
                     gr.update(), 100, 0, False, "[]",
-                    "", gr.update()
+                    "", gr.update(), None
                 )
-            story, choices, h, s, go, hist = api_make_choice(resolved, genre, step, health, history_json)
-            return story, choices, h, s, go, hist, "", gr.update(choices=choices or [], value=None)
+            story, choices, h, s, go, hist, audio_path = api_make_choice(resolved, genre, step, health, history_json)
+            return story, choices, h, s, go, hist, "", gr.update(choices=choices or [], value=None), audio_path
 
         # Start Game: call api_start_game, clear choice input, update radio
         def handle_start_game(genre):
-            story, choices, h, s, go, hist = api_start_game(genre)
-            return story, choices, h, s, go, hist, "", gr.update(choices=choices or [], value=None)
+            story, choices, h, s, go, hist, audio_path = api_start_game(genre)
+            return story, choices, h, s, go, hist, "", gr.update(choices=choices or [], value=None), audio_path
 
         # UI start game button: also updates choices radio and clears text
         start_btn.click(
             fn=handle_start_game,
             inputs=[genre_input],
-            outputs=[story_output, choices_output, health_output, step_output, game_over_output, history_output, choice_text_input, choice_radio],
+            outputs=[story_output, choices_output, health_output, step_output, game_over_output, history_output, choice_text_input, choice_radio, audio_output],
             api_name="start_game",
         )
 
@@ -854,7 +1022,7 @@ def create_gradio_app() -> gr.Blocks:
         choice_btn.click(
             fn=handle_make_choice,
             inputs=[choice_text_input, choice_radio, genre_input, step_input, health_input, history_input],
-            outputs=[story_output, choices_output, health_output, step_output, game_over_output, history_output, choice_text_input, choice_radio],
+            outputs=[story_output, choices_output, health_output, step_output, game_over_output, history_output, choice_text_input, choice_radio, audio_output],
             api_name="make_choice",
         )
 
@@ -899,7 +1067,7 @@ def create_gradio_app() -> gr.Blocks:
         def handle_load(slot_name):
             import urllib.request
             if not slot_name or not slot_name.strip():
-                return "Enter a slot name to load.", gr.update(), 100, 0, False, "[]", ""
+                return "Enter a slot name to load.", gr.update(), 100, 0, False, "[]", "", None
             try:
                 payload = json.dumps({"slot_name": slot_name.strip()}).encode()
                 req = urllib.request.Request(
@@ -911,7 +1079,7 @@ def create_gradio_app() -> gr.Blocks:
                 with urllib.request.urlopen(req) as resp:
                     result = json.loads(resp.read())
                     if result.get("status") != "ok":
-                        return f"Load failed: {result.get('message', 'Unknown error')}", gr.update(), 100, 0, False, "[]", ""
+                        return f"Load failed: {result.get('message', 'Unknown error')}", gr.update(), 100, 0, False, "[]", "", None
                     choices = result.get("choices", [])
                     history = result.get("history", [])
                     story = ""
@@ -928,14 +1096,15 @@ def create_gradio_app() -> gr.Blocks:
                         result.get("game_over", False),
                         json.dumps(history),
                         f"Loaded '{result.get('slot_name', slot_name)}'",
+                        None,
                     )
             except Exception as e:
-                return f"Load failed: {e}", gr.update(), 100, 0, False, "[]", ""
+                return f"Load failed: {e}", gr.update(), 100, 0, False, "[]", "", None
 
         load_btn.click(
             fn=handle_load,
             inputs=[save_slot_input],
-            outputs=[story_output, choice_radio, health_output, step_output, game_over_output, history_input, save_status],
+            outputs=[story_output, choice_radio, health_output, step_output, game_over_output, history_input, save_status, audio_output],
         )
 
     return blocks
@@ -1055,53 +1224,116 @@ def _llm_health_delta(genre: str, choice: str, history: List[Dict]) -> int:
 
 def _run_turn(choice: str, genre: str, step: int, health: int, history: List[Dict]) -> dict:
     """Single source of truth for one adventure turn."""
+    import re
+    prefixes = ["Option one", "Option two", "Option three"]
+
     if step == 0:
         instruction = "Narrate the beginning of the adventure. What happens first? Do not offer choices yet."
         story = generate_llm_story(genre, [], instruction)
         if not story:
-            return generate_procedural_step(genre, 0, 100)
+            res = generate_procedural_step(genre, 0, 100)
+            formatted_choices = [f"{prefixes[i]}: {strip_option_prefix(ch)}" for i, ch in enumerate(res["choices"][:3])]
+            audio_url, audio_path = generate_tts_for_turn(res["story"], formatted_choices, genre)
+            return {
+                "story": res["story"],
+                "choices": formatted_choices,
+                "health": 100,
+                "step": 1,
+                "game_over": False,
+                "history": res.get("history", []),
+                "genre": genre,
+                "audio_url": audio_url,
+                "audio_path": audio_path,
+            }
+
         history = [{"role": "narrator", "text": story}]
         choices = generate_llm_choices(genre, story, history)
         if len(choices) < 2:
             choices = ["Explore the area", "Check your equipment", "Proceed carefully"]
+
+        formatted_choices = [f"{prefixes[i]}: {strip_option_prefix(ch)}" for i, ch in enumerate(choices[:3])]
+        audio_url, audio_path = generate_tts_for_turn(story, formatted_choices, genre)
+        clean_story = re.sub(r"\[MOOD:\s*[a-zA-Z0-9_\-]+\]", "", story).strip()
+
         return {
-            "story": story, "choices": choices[:3], "health": 100,
-            "step": 1, "game_over": False, "history": history,
+            "story": clean_story,
+            "choices": formatted_choices,
+            "health": 100,
+            "step": 1,
+            "game_over": False,
+            "history": history,
             "genre": genre,
+            "audio_url": audio_url,
+            "audio_path": audio_path,
         }
 
-    history.append({"role": "player", "text": choice})
+    clean_choice = strip_option_prefix(choice)
+    history.append({"role": "player", "text": clean_choice})
 
     # Health delta: ask LLM for consequence, fall back to procedural
-    health_delta = _llm_health_delta(genre, choice, history)
+    health_delta = _llm_health_delta(genre, clean_choice, history)
     new_health = max(0, min(100, health + health_delta))
 
     if new_health <= 0:
         instruction = "The player has run out of health. Narrate a quick, dramatic end. Game Over."
         story = generate_llm_story(genre, history, instruction)
+        final_story = story or "Your strength fails. The adventure ends in darkness."
+        audio_url, audio_path = generate_tts_for_turn(final_story, [], genre)
+        clean_story = re.sub(r"\[MOOD:\s*[a-zA-Z0-9_\-]+\]", "", final_story).strip()
         return {
-            "story": story or "Your strength fails. The adventure ends in darkness.",
-            "choices": [], "health": 0, "step": step + 1, "game_over": True,
-            "history": history, "genre": genre,
+            "story": clean_story,
+            "choices": [],
+            "health": 0,
+            "step": step + 1,
+            "game_over": True,
+            "history": history,
+            "genre": genre,
+            "audio_url": audio_url,
+            "audio_path": audio_path,
         }
 
     instruction = (
-        f"The player chose: '{choice}'. "
+        f"The player chose: '{clean_choice}'. "
         "Narrate what happens next as a direct consequence of this action. "
         "Be specific to their choice — reference what they did and its immediate result."
     )
     story = generate_llm_story(genre, history, instruction)
     if not story:
-        return generate_procedural_step(genre, step, health, choice)
+        res = generate_procedural_step(genre, step, health, clean_choice)
+        formatted_choices = [f"{prefixes[i]}: {strip_option_prefix(ch)}" for i, ch in enumerate(res["choices"][:3])]
+        audio_url, audio_path = generate_tts_for_turn(res["story"], formatted_choices, genre)
+        return {
+            "story": res["story"],
+            "choices": formatted_choices,
+            "health": res["health"],
+            "step": res["step"],
+            "game_over": res["game_over"],
+            "history": res.get("history", history),
+            "genre": genre,
+            "audio_url": audio_url,
+            "audio_path": audio_path,
+        }
+
     history.append({"role": "narrator", "text": story})
 
     choices = generate_llm_choices(genre, story, history)
     if len(choices) < 2:
         choices = ["Move forward", "Look around", "Rest a moment"]
+
+    formatted_choices = [f"{prefixes[i]}: {strip_option_prefix(ch)}" for i, ch in enumerate(choices[:3])]
+    audio_url, audio_path = generate_tts_for_turn(story, formatted_choices, genre)
+    clean_story = re.sub(r"\[MOOD:\s*[a-zA-Z0-9_\-]+\]", "", story).strip()
+
     return {
-        "story": story, "choices": choices[:3], "health": new_health,
-        "step": step + 1, "game_over": False, "history": history,
+        "story": clean_story,
+        "choices": formatted_choices,
+        "health": new_health,
+        "step": step + 1,
+        "game_over": False,
+        "history": history,
         "genre": genre,
+        "audio_url": audio_url,
+        "audio_path": audio_path,
     }
 
 
