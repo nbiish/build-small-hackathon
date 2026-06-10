@@ -31,12 +31,12 @@ log = logging.getLogger("inference")
 # The HF model id used for text generation (VibeThinker 1.5B, Gemma 4 12B, etc.)
 INFERENCE_MODEL = os.environ.get(
     "INFERENCE_MODEL",
-    "Qwen/Qwen2.5-1.5B-Instruct",  # small, fast, free-tier friendly
+    "meta-llama/Llama-3.2-1B-Instruct",  # 1B, free-tier, great prose
 )
 
 # Provider: "hf-inference" (free serverless), "together", "fal-ai", "replicate"
 # Free HF inference works for many small models; otherwise use a paid provider.
-INFERENCE_PROVIDER = os.environ.get("INFERENCE_PROVIDER", "hf-inference")
+INFERENCE_PROVIDER = os.environ.get("INFERENCE_PROVIDER", None)
 
 # Token — read from HF Space secrets at runtime.
 HF_TOKEN = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACEHUB_API_TOKEN")
@@ -123,11 +123,10 @@ class InferenceResult:
 def _get_client():
     """Lazy-load the InferenceClient to keep boot fast."""
     from huggingface_hub import InferenceClient
-    return InferenceClient(
-        model=INFERENCE_MODEL,
-        token=HF_TOKEN,
-        provider=INFERENCE_PROVIDER,
-    )
+    kwargs = {"model": INFERENCE_MODEL, "token": HF_TOKEN}
+    if INFERENCE_PROVIDER:
+        kwargs["provider"] = INFERENCE_PROVIDER
+    return InferenceClient(**kwargs)
 
 
 def generate(
