@@ -14,5 +14,5 @@
 
 gradio>=5.0
 fastapi>=0.110
-huggingface_hub>=0.20
+huggingface_hub>=0.36
 uvicorn[standard]>=0.27
