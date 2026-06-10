@@ -236,23 +236,31 @@ def generate_llm_story(
 
 def generate_llm_choices(genre: str, story_context: str) -> List[str]:
     """Ask the LLM to produce 3 short distinct choices for the player."""
-    # Always clear cooldown for choices — they follow a story call in the same turn
     from shared.inference_client import force_clear_cooldown
     force_clear_cooldown("tinybard")
     system = (
-        "You generate 3 short, distinct player choices for an interactive text adventure. "
-        "Output exactly in the format: 1. <choice> | 2. <choice> | 3. <choice>"
+        "Generate exactly 3 short, distinct choices for a player in an interactive text adventure. "
+        "Output ONLY the 3 choices, one per line. No numbering, no bullets, no extra text. "
+        "Example:\n"
+        "Explore the cave entrance\n"
+        "Follow the river downstream\n"
+        "Climb the nearest tree"
     )
     user = f"Genre: {genre}. Last story beat: {story_context[:400]}. Give 3 choices."
     try:
         result = inference_generate(
             project="tinybard",
             messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-            max_new_tokens=200,
-            temperature=0.8,
+            max_new_tokens=150,
+            temperature=0.6,
         )
-        return _parse_choices(result.text)
+        raw = result.text.strip() if result.text else ""
+        logger.info(f"[choices] raw LLM output: {raw!r}")
+        choices = _parse_choices(raw)
+        logger.info(f"[choices] parsed {len(choices)} choices: {choices}")
+        return choices
     except Exception:
+        logger.exception("[choices] LLM choice generation failed")
         return []
 
 
