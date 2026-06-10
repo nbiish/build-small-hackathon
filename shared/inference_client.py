@@ -123,7 +123,7 @@ class InferenceResult:
 def _get_client():
     """Lazy-load the InferenceClient to keep boot fast."""
     from huggingface_hub import InferenceClient
-    kwargs = {"model": INFERENCE_MODEL, "token": HF_TOKEN}
+    kwargs = {"token": HF_TOKEN}
     if INFERENCE_PROVIDER:
         kwargs["provider"] = INFERENCE_PROVIDER
     return InferenceClient(**kwargs)
@@ -153,6 +153,7 @@ def generate(
     client = _get_client()
     start = time.time()
     response = client.chat_completion(
+        model=INFERENCE_MODEL,
         messages=messages,
         max_tokens=max_new_tokens,
         temperature=temperature,
