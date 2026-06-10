@@ -26,6 +26,7 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from gradio import mount_gradio_app
+from pydantic import BaseModel
 
 # Inference client with cooldown (no local GGUF, no llama-cpp-python build!)
 # Path layout: monorepo/shared/inference_client.py — go up two parents from this file.
