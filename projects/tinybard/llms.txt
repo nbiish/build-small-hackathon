@@ -1,0 +1,32 @@
+# TinyBard — DOX
+
+## Purpose
+
+Interactive text adventure generator. ≤4B LLM generates 5-min adventures in a CRT terminal aesthetic. Targets Tiny Titan + Llama Champion badges.
+
+## Ownership
+
+- **Status:** Code complete. Deployed. HF Inference API + cooldowns wired. Local test verified.
+- **GitHub:** github.com/nbiish/tinybard
+- **HF Space:** huggingface.co/spaces/nbiish/tinybard
+
+## Local Contracts
+
+- **Stack:** Qwen2.5-1.5B (default) via HF Inference API + procedural fallback engine
+- **Badges:** Thousand Token Wood, Tiny Titan, Llama Champion
+- Default model: Qwen2.5-1.5B (override via `TINYBARD_MODEL`)
+- Cooldown: 6s (override via `TINYBARD_COOLDOWN_SECONDS`)
+
+## Work Guidance
+
+- `app.py` — Main Gradio app entry point
+- `static/` — Custom CRT terminal HTML/CSS/JS frontend
+- Procedural fallback engine generates adventures when inference unavailable
+- Game loop: start → choose → next scene
+
+## Verification
+
+- End-to-end game loop works (start → choose → next scene)
+- Procedural fallback generates content when no HF_TOKEN
+- Cooldown UI shows in footer
+- CRT terminal aesthetic renders correctly

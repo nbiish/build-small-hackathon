@@ -1,0 +1,34 @@
+# Projects — DOX
+
+## Purpose
+
+Three hackathon Gradio apps, each targeting specific badges and tracks.
+
+## Ownership
+
+- Each project owns its own app.py, modules, requirements, and HF Space
+- Shared inference and aesthetic code lives in `shared/`
+
+## Local Contracts
+
+- Each project must be deployable as an independent HF Space
+- Apps inherit cedar-copper aesthetic from `shared/cedar_copper_tokens.py`
+- Inference via `shared/inference_client.py` — always-fallback pattern
+
+## Work Guidance
+
+- Iterate on live HF Spaces, not localhost
+- Per-project model override env vars: `TINYBARD_MODEL`, `FOCUSFRIEND_MODEL`, `CRITTERCALM_MODEL`
+- Per-project cooldown env vars: `TINYBARD_COOLDOWN_SECONDS`, etc.
+
+## Verification
+
+- Each app deploys to its HF Space without errors
+- Cooldown system active per project
+- Cedar-copper aesthetic renders correctly
+
+## Child DOX Index
+
+- `crittercalm/llms.txt` — Backyard AI pet calming app
+- `focusfriend/llms.txt` — Focus and mindfulness companion
+- `tinybard/llms.txt` — Interactive text adventure generator

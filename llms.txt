@@ -1,33 +1,27 @@
-# Build Small Hackathon — PRD
-# Project Requirements Document
+# Build Small Hackathon — DOX
 
-> Three Gradio apps targeting all tracks + maximum badges + sponsor prizes.
-> Hack window: June 5-15, 2026. Deadline: June 15.
+## Purpose
 
-> This file is the master PRD and stays English-only. Per-project UIs and
-> READMEs may use additional stylistic content for their own artifacts; this
-> doc does not enumerate those choices.
+Three Gradio apps targeting all tracks + maximum badges + sponsor prizes. Hack window: June 5–15, 2026.
 
----
-
-## Overview
+## Ownership
 
 - **Name:** Build Small Hackathon 2026 — Team nbiish
 - **Version:** 0.5.0 — Cedar-Copper Edition (HF Inference API)
-- **Aesthetic:** Cedar-copper visual language — sky-to-sunrise palette (water-blue → cedar → copper → sun-amber → birch-cream), biophilic motifs, sky-to-water gradient banners. Shared CSS variables live in `shared/cedar_copper_tokens.py`.
-- **Purpose:** Win prizes across tracks, badges, and sponsor categories by building delightful, useful AI apps that run locally.
-- **UX:** Gradio web apps (gr.Blocks + mount_gradio_app custom frontends), hosted on HF Spaces.
+- **Operator:** nbiish
 
----
+## Local Contracts
 
-## Rules
+### Aesthetic
 
-### Naming & Comments
+Cedar-copper visual language — sky-to-sunrise palette (water-blue → cedar → copper → sun-amber → birch-cream), biophilic motifs, sky-to-water gradient banners. Shared CSS variables live in `shared/cedar_copper_tokens.py`.
+
+### Rules — Naming & Comments
 
 - Descriptive project names: CritterCalm, FocusFriend, TinyBard
 - Docstrings on all public functions. Comments on non-obvious logic.
 
-### Always
+### Rules — Always
 
 - Models ≤ 32B total params per project
 - Gradio app hosted as HF Space
@@ -36,23 +30,21 @@
 - Python 3.10+ with pinned requirements
 - Cedar-copper aesthetic consistency across all UIs (palette tokens in `shared/cedar_copper_tokens.py`)
 
-### Never
+### Rules — Never
 
 - Cloud API calls in production path
 - Hardcoded secrets or API keys
 - Models > 32B params
 - Default Gradio look without customization attempt
 
-### If
+### Rules — If
 
-- If custom frontend is feasible → use `mount_gradio_app` for Off-Brand badge
-- If model ≤ 4B → tag Tiny Titan eligible
-- If using llama.cpp runtime → tag Llama Champion
-- If fine-tuning is done → publish model to HF Hub
+- Custom frontend feasible → use `mount_gradio_app` for Off-Brand badge
+- Model ≤ 4B → tag Tiny Titan eligible
+- Using llama.cpp runtime → tag Llama Champion
+- Fine-tuning done → publish model to HF Hub
 
----
-
-## Infrastructure
+## Work Guidance
 
 ### Gradio 6.0 + MCP Server
 
@@ -70,11 +62,11 @@
 - Spaces managed via: `hf repos create <name> --type space --space-sdk gradio --public`.
 - Deploy: `git remote add hf https://huggingface.co/spaces/<user>/<space>` then `git push hf main`.
 - HF README metadata: `colorTo` must be one of `[red, yellow, green, blue, indigo, purple, pink, gray]` (no `emerald`/`amber`).
-- HF README metadata: `emoji` must match `/\p{Extended_Pictographic}/u` — only the standard emoji block is allowed; decorative Unicode glyphs (solar/astrological/typographic symbols) fail validation. Use a real emoji.
+- HF README metadata: `emoji` must match `/\p{Extended_Pictographic}/u` — only the standard emoji block is allowed. Use a real emoji.
 
 ### Inference Architecture (v0.5+)
 
-- **All LLM inference** is now via the **Hugging Face Inference API** (serverless). No more local GGUF, no `llama-cpp-python` compile step.
+- **All LLM inference** via the **Hugging Face Inference API** (serverless). No local GGUF, no `llama-cpp-python` compile step.
 - Shared module: `shared/inference_client.py` provides `cooldown_status()`, `cooldown_active()`, `generate()`, and `chat_messages()`.
 - Default model: `Qwen/Qwen2.5-1.5B-Instruct` (free tier, fast, well-suited to chat). Override via `INFERENCE_MODEL`.
 - Per-project model override: `TINYBARD_MODEL`, `FOCUSFRIEND_MODEL`, `CRITTERCALM_MODEL`.
@@ -95,47 +87,27 @@
 
 ### Local Servers (optional)
 
-Local servers were used during v0.4 development for visual inspection. v0.5+ prefers iterating on the live HF Spaces (which use your HF/Modal compute credits). Local servers can still be run for dev:
+- TinyBard: http://localhost:7861/ — FastAPI + Gradio Blocks — nbiish/tinybard
+- FocusFriend: http://localhost:7862/ — Gradio 6.0 — nbiish/focusfriend
+- CritterCalm: http://localhost:7863/ — Gradio 6.0 — nbiish/crittercalm
 
-| Project | URL | Stack | HF Space |
-|---|---|---|---|
-| TinyBard | http://localhost:7861/ | FastAPI + Gradio Blocks | nbiish/tinybard |
-| FocusFriend | http://localhost:7862/ | Gradio 6.0 | nbiish/focusfriend |
-| CritterCalm | http://localhost:7863/ | Gradio 6.0 | nbiish/crittercalm |
+### Short-term Goals
 
----
+- Iterate on the live HF Spaces
+- Set HF_TOKEN + INFERENCE_MODEL Space secrets to enable real LLM-backed adventures
+- Record demo videos and post to social media
+- Write and publish Field Notes blog posts
+- Share agent traces for Sharing is Caring badge
+- Polish UIs for demo appeal
 
-## Projects
+## Verification
 
-### 1. CritterCalm (Backyard AI)
-
-- **Status:** Code complete. Deployed. HF Inference API + cooldowns wired for script generation. OmniVoice voice cloning still requires local install.
-- **Stack:** OmniVoice (0.6B, local optional) + Kokoro TTS (82M, local optional) + Qwen2.5-7B (default) via HF Inference API
-- **Badges:** Off the Grid, Well-Tuned (TBD), Field Notes, Off-Brand
-- **GitHub:** github.com/nbiish/crittercalm
-- **HF Space:** huggingface.co/spaces/nbiish/crittercalm
-- **Standalone repo:** /Volumes/1tb-sandisk/code-external/crittercalm-repo
-
-### 2. FocusFriend (Thousand Token Wood)
-
-- **Status:** Code complete. Deployed. HF Inference API + cooldowns wired. Gradio 6 Chatbot dict-format fixed.
-- **Stack:** Qwen2.5-7B (default) via HF Inference API
-- **Badges:** Off-Brand (sun-amber custom theme), Field Notes, Cooldowns badge
-- **GitHub:** github.com/nbiish/focusfriend
-- **HF Space:** huggingface.co/spaces/nbiish/focusfriend
-- **Standalone repo:** /Volumes/1tb-sandisk/code-external/focusfriend-repo
-
-### 3. TinyBard (Thousand Token Wood + Tiny Titan + Llama Champion)
-
-- **Status:** Code complete. Deployed. HF Inference API + cooldowns wired. Local test verified (procedural fallback + cooldown UI).
-- **Concept:** ≤4B LLM generates 5-min interactive text adventures in a CRT terminal aesthetic.
-- **Stack:** Qwen2.5-1.5B (default) via HF Inference API + procedural fallback engine
-
----
+- All 3 apps deployed to HF Spaces and accessible
+- Cooldown system active in `shared/inference_client.py`
+- Cedar-copper aesthetic consistent across all UIs
+- No hardcoded secrets; no cloud API calls in production path
 
 ## TODO
-
-> Keep tasks atomic and testable.
 
 ### In Progress
 
@@ -156,36 +128,20 @@ Local servers were used during v0.4 development for visual inspection. v0.5+ pre
 - [x] Monorepo structure with projects/ directory + shared/ aesthetic module
 - [x] INTELLIGENCE.md — full hackathon landscape analysis
 - [x] SUBMISSION_DRAFTS.md — social posts + Field Notes drafts
-- [x] HF CLI installed + skills configured (`hf skills add --global`)
-- [x] llama-cpp-python installed (conda-forge v0.3.16) — for reference; v0.5+ uses HF Inference API
+- [x] HF CLI installed + skills configured
+- [x] llama-cpp-python installed — for reference; v0.5+ uses HF Inference API
 - [x] Local verification: all 3 apps run on ports 7861/7862/7863
-- [x] TinyBard end-to-end game loop verified (start → choose → next scene)
-- [x] FocusFriend chat verified (user message → Pip reply)
-- [x] CritterCalm UI navigation verified (all 3 tabs render)
-- [x] **v0.5: HF Inference API wired into all 3 apps** (no local GGUF, no build step)
-- [x] **v0.5: Cooldown system** in `shared/inference_client.py` to protect HF/Modal credit budget
-- [x] **v0.5: TinyBard local test** — procedural fallback works when no HF_TOKEN; cooldown UI shows in footer
+- [x] TinyBard end-to-end game loop verified
+- [x] FocusFriend chat verified
+- [x] CritterCalm UI navigation verified
+- [x] v0.5: HF Inference API wired into all 3 apps
+- [x] v0.5: Cooldown system in shared/inference_client.py
+- [x] v0.5: TinyBard local test — procedural fallback + cooldown UI
 
----
+## Child DOX Index
 
-## Short-term Goals
-
-- Iterate on the live HF Spaces (nbiish/tinybard, nbiish/focusfriend, nbiish/crittercalm)
-- Set HF_TOKEN + INFERENCE_MODEL Space secrets to enable real LLM-backed adventures
-- Record demo videos and post to social media
-- Write and publish Field Notes blog posts
-- Share agent traces for Sharing is Caring badge
-- Polish UIs for demo appeal
-
----
-
-## Reference
-
-- CritterCalm: projects/crittercalm/ + github.com/nbiish/crittercalm
-- FocusFriend: projects/focusfriend/ + github.com/nbiish/focusfriend
-- TinyBard: projects/tinybard/ + github.com/nbiish/tinybard
-- Aesthetic module: shared/cedar_copper_tokens.py
-- Inference client: shared/inference_client.py
-- ML Intern: github.com/huggingface/ml-intern
-- HF Agents CLI: huggingface.co/docs/hub/en/agents-cli
-- Gradio MCP: gradio.app/guides/model-context-protocol
+- `projects/llms.txt` — Three hackathon Gradio apps (CritterCalm, FocusFriend, TinyBard)
+- `projects/crittercalm/llms.txt` — Backyard AI pet calming app
+- `projects/focusfriend/llms.txt` — Focus and mindfulness companion
+- `projects/tinybard/llms.txt` — Interactive text adventure generator
+- `shared/llms.txt` — Shared inference client and cedar-copper aesthetic tokens
