@@ -34,9 +34,9 @@ INFERENCE_MODEL = os.environ.get(
     "Qwen/Qwen2.5-1.5B-Instruct",  # small, fast, free-tier friendly
 )
 
-# Provider: "hf-inference" (free serverless), "together", "fal-ai", "replicate"
+# Provider: "featherless-ai" (supports small instruct models), "hf-inference" (free serverless), "together", "fal-ai", "replicate"
 # Free HF inference works for many small models; otherwise use a paid provider.
-INFERENCE_PROVIDER = os.environ.get("INFERENCE_PROVIDER", "hf-inference")
+INFERENCE_PROVIDER = os.environ.get("INFERENCE_PROVIDER", "featherless-ai")
 
 # Token — read from HF Space secrets at runtime.
 HF_TOKEN = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACEHUB_API_TOKEN")
