@@ -1,0 +1,32 @@
+# CritterCalm — DOX
+
+## Purpose
+
+Backyard AI pet calming app. Generates calming scripts for pets using LLM inference, with optional voice cloning via OmniVoice + Kokoro TTS.
+
+## Ownership
+
+- **Status:** Code complete. Deployed. HF Inference API + cooldowns wired. Voice cloning still requires local install.
+- **GitHub:** github.com/nbiish/crittercalm
+- **HF Space:** huggingface.co/spaces/nbiish/crittercalm
+- **Standalone repo:** /Volumes/1tb-sandisk/code-external/crittercalm-repo
+
+## Local Contracts
+
+- **Stack:** OmniVoice (0.6B, local optional) + Kokoro TTS (82M, local optional) + Qwen2.5-7B (default) via HF Inference API
+- **Badges:** Off the Grid, Well-Tuned (TBD), Field Notes, Off-Brand
+- Default model: Qwen2.5-7B (override via `CRITTERCALM_MODEL`)
+- Cooldown: 12s (override via `CRITTERCALM_COOLDOWN_SECONDS`)
+
+## Work Guidance
+
+- `app.py` — Main Gradio app entry point
+- `content/` — Script generator and templates
+- `voice_cloning/` — OmniVoice cloner
+- `utils/` — Audio utilities
+
+## Verification
+
+- UI renders all 3 tabs
+- Script generation works with and without inference
+- Voice cloning pipeline functions when local dependencies available

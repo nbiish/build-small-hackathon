@@ -1,0 +1,32 @@
+# FocusFriend — DOX
+
+## Purpose
+
+Focus and mindfulness companion. Four modes: Chat, Focus, Breathe, Meditate. Powered by Qwen2.5-7B via HF Inference API.
+
+## Ownership
+
+- **Status:** Code complete. Deployed. HF Inference API + cooldowns wired. Gradio 6 Chatbot dict-format fixed.
+- **GitHub:** github.com/nbiish/focusfriend
+- **HF Space:** huggingface.co/spaces/nbiish/focusfriend
+- **Standalone repo:** /Volumes/1tb-sandisk/code-external/focusfriend-repo
+
+## Local Contracts
+
+- **Stack:** Qwen2.5-7B (default) via HF Inference API
+- **Badges:** Off-Brand (sun-amber custom theme), Field Notes, Cooldowns badge
+- Default model: Qwen2.5-7B (override via `FOCUSFRIEND_MODEL`)
+- Cooldown: 10s (override via `FOCUSFRIEND_COOLDOWN_SECONDS`)
+
+## Work Guidance
+
+- `app.py` — Main Gradio app entry point
+- `character/` — ASCII art and personality definitions
+- `inference/` — LLM integration layer
+- `modes/` — Chat, Focus, Breathe, Meditate mode implementations
+
+## Verification
+
+- All 4 modes render and respond
+- Chat produces Pip replies with correct dict format
+- Cedar-copper theme renders with sun-amber accent

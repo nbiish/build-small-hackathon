@@ -1,0 +1,29 @@
+# Shared — DOX
+
+## Purpose
+
+Cross-project modules: inference client and cedar-copper aesthetic tokens used by all three apps.
+
+## Ownership
+
+- Inference client: `inference_client.py`
+- Aesthetic tokens: `cedar_copper_tokens.py`
+
+## Local Contracts
+
+- `inference_client.py` provides `cooldown_status()`, `cooldown_active()`, `generate()`, and `chat_messages()`
+- Default model: `Qwen/Qwen2.5-1.5B-Instruct`. Override via `INFERENCE_MODEL`.
+- All LLM calls have always-fallback to procedural/template output
+- `cedar_copper_tokens.py` exports CSS variables for the sky-to-sunrise palette
+
+## Work Guidance
+
+- Changes here affect all three apps — test across CritterCalm, FocusFriend, TinyBard
+- Cooldown defaults: tinybard 6s, focusfriend 10s, crittercalm 12s
+- Override via per-project env vars or global `INFERENCE_COOLDOWN_SECONDS`
+
+## Verification
+
+- Inference client loads without errors
+- Cooldown system respects per-project timing
+- Cedar-copper tokens render consistent palette across all apps
