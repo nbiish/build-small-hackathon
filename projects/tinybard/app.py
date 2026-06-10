@@ -189,7 +189,10 @@ def generate_procedural_step(genre: str, step: int, health: int, choice: str = "
 # LLM Generation Logic (HF Inference API + cooldown)
 # ---------------------------------------------------------------------------
 def _parse_messages(genre: str, history: List[Dict[str, str]], next_instruction: str) -> list[Dict[str, str]]:
-    """Translate internal history into OpenAI-style chat messages."""
+    """Translate internal history into OpenAI-style chat messages.
+
+    Includes the last 3 story beats as context for coherent narrative flow.
+    """
     system = (
         "You are Nanaboozhoo, the trickster storyteller of Anishinaabe tradition. "
         "You spin interactive text adventures with wit, mischief, and wonder. "
@@ -200,11 +203,15 @@ def _parse_messages(genre: str, history: List[Dict[str, str]], next_instruction:
         "Focus on action, mystery, and choice. Do not offer numbered choices unless asked."
     )
     msgs: List[Dict[str, str]] = [{"role": "system", "content": system}]
-    for h in (history or []):
+
+    # Include last 3 history entries as context (most recent first for relevance)
+    recent_history = (history or [])[-6:]  # Last 6 entries = ~3 story beats (player + narrator pairs)
+    for h in recent_history:
         if h.get("role") == "player":
             msgs.append({"role": "user", "content": h["text"]})
         elif h.get("role") == "narrator":
             msgs.append({"role": "assistant", "content": h["text"]})
+
     msgs.append({"role": "user", "content": next_instruction})
     return msgs
 
@@ -234,19 +241,34 @@ def generate_llm_story(
         return ""
 
 
-def generate_llm_choices(genre: str, story_context: str) -> List[str]:
-    """Ask the LLM to produce 3 short distinct choices for the player."""
+def generate_llm_choices(genre: str, story_context: str, history: List[Dict[str, str]] | None = None) -> List[str]:
+    """Ask the LLM to produce 3 verb-based action choices for the player."""
     from shared.inference_client import force_clear_cooldown
     force_clear_cooldown("tinybard")
+
+    # Build history context for coherent choices
+    history_context = ""
+    if history:
+        recent = history[-4:]  # Last 2 story beats
+        history_context = "\n".join(
+            f"{'Player' if h.get('role') == 'player' else 'Narrator'}: {h.get('text', '')[:200]}"
+            for h in recent
+        )
+
     system = (
-        "Generate exactly 3 short, distinct choices for a player in an interactive text adventure. "
-        "Output ONLY the 3 choices, one per line. No numbering, no bullets, no extra text. "
-        "Example:\n"
-        "Explore the cave entrance\n"
-        "Follow the river downstream\n"
-        "Climb the nearest tree"
+        "You generate 3 short, action-oriented player choices for an interactive text adventure. "
+        "Each choice MUST start with a verb (action word). Examples: "
+        "'Investigate the glowing tree', 'Run toward the fire', 'Hide behind the rocks', "
+        "'Speak to the stranger', 'Examine the artifact', 'Search for clues'. "
+        "NEVER use descriptive phrases like 'The forest is dark' or 'Something glitters'. "
+        "Output exactly 3 choices, one per line, no numbering, no bullets."
     )
-    user = f"Genre: {genre}. Last story beat: {story_context[:400]}. Give 3 choices."
+    user = (
+        f"Genre: {genre}.\n"
+        f"Recent story context:\n{history_context}\n\n"
+        f"Current situation: {story_context[:300]}\n\n"
+        f"Generate 3 verb-based action choices:"
+    )
     try:
         result = inference_generate(
             project="tinybard",
@@ -741,7 +763,7 @@ def create_gradio_app() -> gr.Blocks:
                 )
 
             history = [{"role": "narrator", "text": story}]
-            choices = generate_llm_choices(genre, story)
+            choices = generate_llm_choices(genre, story, history)
             if len(choices) < 2:
                 fallback = generate_procedural_step(genre, 0, 100)
                 choices = fallback["choices"]
@@ -761,7 +783,7 @@ def create_gradio_app() -> gr.Blocks:
 
             history.append({"role": "player", "text": choice})
 
-            health_delta = random.choice([-15, 0, 10])
+            health_delta = _llm_health_delta(genre, choice, history)
             new_health = max(0, min(100, health + health_delta))
 
             if new_health <= 0:
@@ -772,7 +794,11 @@ def create_gradio_app() -> gr.Blocks:
                     [], 0, step + 1, True, json.dumps(history)
                 )
 
-            instruction = "Narrate what happens next as a result of the player's choice."
+            instruction = (
+                f"The player chose: '{choice}'. "
+                "Narrate what happens next as a direct consequence of this action. "
+                "Be specific to their choice — reference what they did and its immediate result."
+            )
             story = generate_llm_story(genre, history, instruction)
             if not story:
                 result = generate_procedural_step(genre, step, health, choice)
@@ -784,7 +810,7 @@ def create_gradio_app() -> gr.Blocks:
 
             history.append({"role": "narrator", "text": story})
 
-            choices = generate_llm_choices(genre, story)
+            choices = generate_llm_choices(genre, story, history)
             if len(choices) < 2:
                 choices = ["Move forward", "Look around", "Rest a moment"]
 
@@ -1001,19 +1027,41 @@ async def model_status():
 # ---------------------------------------------------------------------------
 # Game Logic — exposed as both FastAPI (clean JSON) and Gradio (MCP)
 # ---------------------------------------------------------------------------
-def _run_turn(choice: str, genre: str, step: int, health: int, history: List[Dict]) -> dict:
-    """Single source of truth for one adventure turn.
+def _llm_health_delta(genre: str, choice: str, history: List[Dict]) -> int:
+    """Ask the LLM whether the choice was risky (+/-), then fall back to random."""
+    from shared.inference_client import force_clear_cooldown
+    force_clear_cooldown("tinybard")
+    system = (
+        "Rate the risk of a player action in a text adventure. "
+        "Reply with ONLY a number: -15 (dangerous), 0 (neutral), or +10 (beneficial). "
+        "No explanation, just the number."
+    )
+    user = f"Genre: {genre}. Action: '{choice}'. Risk rating:"
+    try:
+        result = inference_generate(
+            project="tinybard",
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+            max_new_tokens=10,
+            temperature=0.3,
+        )
+        text = result.text.strip()
+        for token in ["-15", "-10", "0", "+10", "10", "+5", "-5"]:
+            if token in text:
+                return int(token)
+    except Exception:
+        pass
+    return random.choice([-15, 0, 10])
 
-    Returns a dict the frontend can consume directly. Used by both the
-    FastAPI /api/game/* endpoints and the Gradio MCP tools.
-    """
+
+def _run_turn(choice: str, genre: str, step: int, health: int, history: List[Dict]) -> dict:
+    """Single source of truth for one adventure turn."""
     if step == 0:
         instruction = "Narrate the beginning of the adventure. What happens first? Do not offer choices yet."
         story = generate_llm_story(genre, [], instruction)
         if not story:
             return generate_procedural_step(genre, 0, 100)
         history = [{"role": "narrator", "text": story}]
-        choices = generate_llm_choices(genre, story)
+        choices = generate_llm_choices(genre, story, history)
         if len(choices) < 2:
             choices = ["Explore the area", "Check your equipment", "Proceed carefully"]
         return {
@@ -1023,7 +1071,9 @@ def _run_turn(choice: str, genre: str, step: int, health: int, history: List[Dic
         }
 
     history.append({"role": "player", "text": choice})
-    health_delta = random.choice([-15, 0, 10])
+
+    # Health delta: ask LLM for consequence, fall back to procedural
+    health_delta = _llm_health_delta(genre, choice, history)
     new_health = max(0, min(100, health + health_delta))
 
     if new_health <= 0:
@@ -1035,13 +1085,17 @@ def _run_turn(choice: str, genre: str, step: int, health: int, history: List[Dic
             "history": history, "genre": genre,
         }
 
-    instruction = "Narrate what happens next as a result of the player's choice."
+    instruction = (
+        f"The player chose: '{choice}'. "
+        "Narrate what happens next as a direct consequence of this action. "
+        "Be specific to their choice — reference what they did and its immediate result."
+    )
     story = generate_llm_story(genre, history, instruction)
     if not story:
         return generate_procedural_step(genre, step, health, choice)
     history.append({"role": "narrator", "text": story})
 
-    choices = generate_llm_choices(genre, story)
+    choices = generate_llm_choices(genre, story, history)
     if len(choices) < 2:
         choices = ["Move forward", "Look around", "Rest a moment"]
     return {
