@@ -191,9 +191,12 @@ def generate_procedural_step(genre: str, step: int, health: int, choice: str = "
 def _parse_messages(genre: str, history: List[Dict[str, str]], next_instruction: str) -> list[Dict[str, str]]:
     """Translate internal history into OpenAI-style chat messages."""
     system = (
-        "You are the narrator of an interactive text adventure game. "
+        "You are Nanaboozhoo, the trickster storyteller of Anishinaabe tradition. "
+        "You spin interactive text adventures with wit, mischief, and wonder. "
         f"Genre: {genre}. Write in the second person ('You...'). "
-        "Keep descriptions highly atmospheric but short (under 3 sentences). "
+        "Keep descriptions atmospheric but concise (2-3 sentences). "
+        "Be unpredictable — every story beat should surprise. "
+        "Never repeat the same scene twice. "
         "Focus on action, mystery, and choice. Do not offer numbered choices unless asked."
     )
     msgs: List[Dict[str, str]] = [{"role": "system", "content": system}]
@@ -213,9 +216,8 @@ def generate_llm_story(
     max_tokens: int = 180,
 ) -> str:
     """Generate story text via HF Inference API (with cooldown)."""
-    if cooldown_active("tinybard"):
-        log.info("tinybard inference skipped (cooldown active)")
-        return ""
+    from shared.inference_client import force_clear_cooldown
+    force_clear_cooldown("tinybard")
     try:
         msgs = _parse_messages(genre, history, next_instruction)
         result = inference_generate(
@@ -226,7 +228,6 @@ def generate_llm_story(
         )
         return result.text
     except RuntimeError:
-        # Cooldown — let caller fall back
         return ""
     except Exception as e:
         log.warning(f"HF Inference error (fallback to procedural): {e}")
@@ -235,8 +236,9 @@ def generate_llm_story(
 
 def generate_llm_choices(genre: str, story_context: str) -> List[str]:
     """Ask the LLM to produce 3 short distinct choices for the player."""
-    if cooldown_active("tinybard"):
-        return []
+    # Always clear cooldown for choices — they follow a story call in the same turn
+    from shared.inference_client import force_clear_cooldown
+    force_clear_cooldown("tinybard")
     system = (
         "You generate 3 short, distinct player choices for an interactive text adventure. "
         "Output exactly in the format: 1. <choice> | 2. <choice> | 3. <choice>"
@@ -806,27 +808,12 @@ def create_gradio_app() -> gr.Blocks:
             story, choices, h, s, go, hist = api_start_game(genre)
             return story, choices, h, s, go, hist, "", gr.update(choices=choices or [], value=None)
 
-        # API endpoints (preserved for MCP)
-        start_btn.click(
-            fn=api_start_game,
-            inputs=[genre_input],
-            outputs=[story_output, choices_output, health_output, step_output, game_over_output, history_output],
-            api_name="start_game",
-        )
-
         # UI start game button: also updates choices radio and clears text
         start_btn.click(
             fn=handle_start_game,
             inputs=[genre_input],
             outputs=[story_output, choices_output, health_output, step_output, game_over_output, history_output, choice_text_input, choice_radio],
-        )
-
-        # API make_choice endpoint (preserved for MCP)
-        choice_btn.click(
-            fn=api_make_choice,
-            inputs=[choice_text_input, genre_input, step_input, health_input, history_input],
-            outputs=[story_output, choices_output, health_output, step_output, game_over_output, history_output],
-            api_name="make_choice",
+            api_name="start_game",
         )
 
         # UI make choice button: resolves radio/text, updates choices radio
@@ -834,6 +821,7 @@ def create_gradio_app() -> gr.Blocks:
             fn=handle_make_choice,
             inputs=[choice_text_input, choice_radio, genre_input, step_input, health_input, history_input],
             outputs=[story_output, choices_output, health_output, step_output, game_over_output, history_output, choice_text_input, choice_radio],
+            api_name="make_choice",
         )
 
         # Save game handler
@@ -961,14 +949,7 @@ def _run_turn(choice: str, genre: str, step: int, health: int, history: List[Dic
     Returns a dict the frontend can consume directly. Used by both the
     FastAPI /api/game/* endpoints and the Gradio MCP tools.
     """
-    # Cooldown short-circuit: if active, the game just uses the procedural
-    # engine for this turn. This protects your HF/Modal credit budget.
-    in_cooldown = cooldown_active("tinybard")
-
     if step == 0:
-        # New game
-        if in_cooldown:
-            return generate_procedural_step(genre, 0, 100)
         instruction = "Narrate the beginning of the adventure. What happens first? Do not offer choices yet."
         story = generate_llm_story(genre, [], instruction)
         if not story:
@@ -982,10 +963,6 @@ def _run_turn(choice: str, genre: str, step: int, health: int, history: List[Dic
             "step": 1, "game_over": False, "history": history,
             "genre": genre,
         }
-
-    # Subsequent turn
-    if in_cooldown:
-        return generate_procedural_step(genre, step, health, choice)
 
     history.append({"role": "player", "text": choice})
     health_delta = random.choice([-15, 0, 10])

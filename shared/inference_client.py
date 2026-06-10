@@ -34,9 +34,9 @@ INFERENCE_MODEL = os.environ.get(
     "meta-llama/Llama-3.2-1B-Instruct",  # 1B, free-tier, great prose
 )
 
-# Provider: "hf-inference" (free serverless), "together", "fal-ai", "replicate"
+# Provider: "featherless-ai" (supports small instruct models), "hf-inference" (free serverless), "together", "fal-ai", "replicate"
 # Free HF inference works for many small models; otherwise use a paid provider.
-INFERENCE_PROVIDER = os.environ.get("INFERENCE_PROVIDER", None)
+INFERENCE_PROVIDER = os.environ.get("INFERENCE_PROVIDER", "featherless-ai")
 
 # Token — read from HF Space secrets at runtime.
 HF_TOKEN = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACEHUB_API_TOKEN")
