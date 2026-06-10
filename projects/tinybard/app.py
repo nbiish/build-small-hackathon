@@ -248,7 +248,7 @@ def generate_llm_choices(genre: str, story_context: str) -> List[str]:
         result = inference_generate(
             project="tinybard",
             messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-            max_new_tokens=80,
+            max_new_tokens=200,
             temperature=0.8,
         )
         return _parse_choices(result.text)
@@ -908,17 +908,67 @@ def create_gradio_app() -> gr.Blocks:
 
 
 def _parse_choices(choices_text: str) -> List[str]:
-    """Parse LLM choice output into a list of choices."""
+    """Parse LLM choice output into a list of choices.
+
+    Handles multiple formats:
+      - Pipe-delimited: "1. choice | 2. choice | 3. choice"
+      - Newline-delimited: "1. choice\n2. choice\n3. choice"
+      - Numbered: "1) choice\n2) choice\n3) choice"
+      - Bare lines: "choice\nchoice\nchoice"
+    Always returns at least 3 choices (pads with procedural fallbacks).
+    """
+    import re
+
+    if not choices_text or not choices_text.strip():
+        return _fallback_choices()
+
+    text = choices_text.strip()
+
+    # Strategy 1: pipe-delimited "1. ... | 2. ... | 3. ..."
+    if "|" in text and text.count("|") >= 2:
+        raw = [seg.strip() for seg in text.split("|")]
+        choices = []
+        for seg in raw:
+            # Strip leading "1." or "1)" numbering
+            cleaned = re.sub(r"^\d+[\.\)]\s*", "", seg).strip()
+            if cleaned:
+                choices.append(cleaned)
+        if len(choices) >= 3:
+            return choices[:3]
+
+    # Strategy 2: newline-delimited (numbered or bare lines)
+    lines = [ln.strip() for ln in text.split("\n") if ln.strip()]
     choices = []
-    if "|" in choices_text:
-        choices = [c.split(".")[-1].strip() for c in choices_text.split("|")]
-    else:
-        for line in choices_text.split("\n"):
-            if "." in line or any(d in line for d in "123"):
-                parts = line.split(".", 1)
-                if len(parts) > 1:
-                    choices.append(parts[1].strip())
-    return choices
+    for ln in lines:
+        # Strip leading "1." or "1)" or "1:" numbering
+        cleaned = re.sub(r"^\d+[\.\):\-]+\s*", "", ln).strip()
+        # Skip lines that look like headers/meta, not choices
+        if cleaned and len(cleaned) > 3 and not cleaned.startswith("#") and not cleaned.startswith("Here"):
+            choices.append(cleaned)
+
+    if len(choices) >= 3:
+        return choices[:3]
+
+    # Strategy 3: comma-separated fallback (rare but some models do this)
+    if len(choices) < 3 and "," in text:
+        comma_choices = [c.strip() for c in text.split(",") if c.strip()]
+        if len(comma_choices) >= 3:
+            return [re.sub(r"^\d+[\.\)]\s*", "", c).strip() for c in comma_choices[:3]]
+
+    # Pad with procedural fallbacks if we got some but not 3
+    while len(choices) < 3:
+        choices.append(_fallback_choices()[len(choices)])
+
+    return choices[:3]
+
+
+def _fallback_choices() -> List[str]:
+    """Return 3 procedural fallback choices when LLM parsing fails."""
+    return [
+        "Press forward into the unknown",
+        "Examine your surroundings carefully",
+        "Call out and listen for a response",
+    ]
 
 
 # ---------------------------------------------------------------------------
